@@ -8,7 +8,7 @@
 *
 *********************************************************************/
 
-/* Author: Ioan Sucan */
+/* Author: Ioan Sucan, Shi Shenglei */
 
 #include "omplapp/geometry/detail/assimpUtil.h"
 #include <ompl/util/Console.h>
@@ -64,11 +64,11 @@ namespace ompl
                                     std::vector<aiVector3D> &vertices)
             {
                 transform *= node->mTransformation;
-                for (unsigned int i = 0 ; i < node->mNumMeshes; ++i)
+                for (unsigned int i = 0; i < node->mNumMeshes; ++i)
                 {
                     const aiMesh* a = scene->mMeshes[node->mMeshes[i]];
-                    for (unsigned int i = 0 ; i < a->mNumVertices ; ++i)
-                        vertices.push_back(transform * a->mVertices[i]);
+                    for (unsigned int j = 0 ; j < a->mNumVertices ; ++j)
+                        vertices.push_back(transform * a->mVertices[j]);
                 }
 
                 for (unsigned int n = 0; n < node->mNumChildren; ++n)
@@ -79,16 +79,18 @@ namespace ompl
                                      std::vector<aiVector3D> &triangles)
             {
                 transform *= node->mTransformation;
-                for (unsigned int i = 0 ; i < node->mNumMeshes; ++i)
+                for (unsigned int i = 0; i < node->mNumMeshes; ++i)
                 {
                     const aiMesh* a = scene->mMeshes[node->mMeshes[i]];
-                    for (unsigned int i = 0 ; i < a->mNumFaces ; ++i)
-                        if (a->mFaces[i].mNumIndices == 3)
+                    for (unsigned int j = 0 ; j < a->mNumFaces ; ++j)
+                    {
+                        if (a->mFaces[j].mNumIndices == 3)
                         {
-                            triangles.push_back(transform * a->mVertices[a->mFaces[i].mIndices[0]]);
-                            triangles.push_back(transform * a->mVertices[a->mFaces[i].mIndices[1]]);
-                            triangles.push_back(transform * a->mVertices[a->mFaces[i].mIndices[2]]);
+                            triangles.push_back(transform * a->mVertices[a->mFaces[j].mIndices[0]]);
+                            triangles.push_back(transform * a->mVertices[a->mFaces[j].mIndices[1]]);
+                            triangles.push_back(transform * a->mVertices[a->mFaces[j].mIndices[2]]);
                         }
+                    }
                 }
 
                 for (unsigned int n = 0; n < node->mNumChildren; ++n)

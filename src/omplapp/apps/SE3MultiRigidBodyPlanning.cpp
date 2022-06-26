@@ -28,6 +28,27 @@ void ompl::app::SE3MultiRigidBodyPlanning::inferEnvironmentBounds()
     // Infer bounds for all n SE(3) spaces
     for (unsigned int i = 0; i < n_; ++i)
         InferEnvironmentBounds(getGeometricComponentStateSpace(i), *static_cast<RigidBodyGeometry*>(this));
+
+    auto bounds = getGeometricComponentStateSpace(0)->as<base::SE3StateSpace>()->getBounds();
+    for (unsigned int i = 1; i < n_; ++i)
+    {
+        auto b = getGeometricComponentStateSpace(i)->as<base::SE3StateSpace>()->getBounds();
+        if (bounds.low[0] > b.low[0])
+            bounds.low[0] = b.low[0];
+        if (bounds.low[1] > b.low[1])
+            bounds.low[1] = b.low[1];
+        if (bounds.low[2] > b.low[2])
+            bounds.low[2] = b.low[2];
+        if (bounds.high[0] < b.high[0])
+            bounds.high[0] = b.high[0];
+        if (bounds.high[1] < b.high[1])
+            bounds.high[1] = b.high[1];
+        if (bounds.high[2] < b.high[2])
+            bounds.high[2] = b.high[2];
+    }
+
+    for (unsigned int i = 0; i < n_; ++i)
+        getGeometricComponentStateSpace(i)->as<base::SE3StateSpace>()->setBounds(bounds);
 }
 
 void ompl::app::SE3MultiRigidBodyPlanning::inferProblemDefinitionBounds()
@@ -37,6 +58,27 @@ void ompl::app::SE3MultiRigidBodyPlanning::inferProblemDefinitionBounds()
         InferProblemDefinitionBounds(AppTypeSelector<AppType::GEOMETRIC>::SimpleSetup::getProblemDefinition(),
                                     getGeometricStateExtractor(), factor_, add_,
                                     n_, getGeometricComponentStateSpace(i), mtype_);
+
+    auto bounds = getGeometricComponentStateSpace(0)->as<base::SE3StateSpace>()->getBounds();
+    for (unsigned int i = 1; i < n_; ++i)
+    {
+        auto b = getGeometricComponentStateSpace(i)->as<base::SE3StateSpace>()->getBounds();
+        if (bounds.low[0] > b.low[0])
+            bounds.low[0] = b.low[0];
+        if (bounds.low[1] > b.low[1])
+            bounds.low[1] = b.low[1];
+        if (bounds.low[2] > b.low[2])
+            bounds.low[2] = b.low[2];
+        if (bounds.high[0] < b.high[0])
+            bounds.high[0] = b.high[0];
+        if (bounds.high[1] < b.high[1])
+            bounds.high[1] = b.high[1];
+        if (bounds.high[2] < b.high[2])
+            bounds.high[2] = b.high[2];
+    }
+
+    for (unsigned int i = 0; i < n_; ++i)
+        getGeometricComponentStateSpace(i)->as<base::SE3StateSpace>()->setBounds(bounds);
 }
 
 ompl::base::ScopedState<> ompl::app::SE3MultiRigidBodyPlanning::getDefaultStartState() const

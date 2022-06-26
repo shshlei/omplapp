@@ -8,13 +8,16 @@
 *
 *********************************************************************/
 
-/* Author: Ioan Sucan */
+/* Author: Ioan Sucan, Shi Shenglei */
 
 #include "omplapp/geometry/RigidBodyGeometry.h"
 #if OMPL_HAS_PQP
 #include "omplapp/geometry/detail/PQPStateValidityChecker.h"
 #endif
 #include "omplapp/geometry/detail/FCLStateValidityChecker.h"
+
+#include "omplapp/geometry/detail/assimpUtil.h"
+#include "omplapp/geometry/detail/ContactStateValidityChecker.h"
 
 boost::filesystem::path ompl::app::RigidBodyGeometry::findMeshFile(const std::string& fname)
 {
@@ -77,6 +80,57 @@ bool ompl::app::RigidBodyGeometry::addRobotMesh(const std::string &robot)
     return false;
 }
 
+//bool ompl::app::RigidBodyGeometry::addRobotMesh(const std::string &robot)
+//{
+//    assert(!robot.empty());
+//    std::size_t p = importerRobot_.size();
+//    importerRobot_.resize(p + 1);
+//    importerRobot_[p] = std::make_shared<Assimp::Importer>();
+//
+//    const boost::filesystem::path path = findMeshFile(robot);
+//    if (path.empty())
+//        OMPL_ERROR("File '%s' not found in mesh path.", robot.c_str());
+//
+//    importerRobot_[p]->SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
+//                          aiComponent_NORMALS | aiComponent_TANGENTS_AND_BITANGENTS | aiComponent_COLORS |
+//                          aiComponent_TEXCOORDS | aiComponent_BONEWEIGHTS | aiComponent_ANIMATIONS |
+//                          aiComponent_TEXTURES | aiComponent_LIGHTS | aiComponent_CAMERAS |
+//                          aiComponent_MATERIALS);
+//
+//    const aiScene* robotScene = importerRobot_[p]->ReadFile(path.string().c_str(),
+//                                                            aiProcess_GenNormals             |
+//                                                            aiProcess_Triangulate            |
+//                                                            aiProcess_JoinIdenticalVertices  |
+//                                                            aiProcess_SortByPType            |
+//                                                            aiProcess_RemoveComponent); 
+//
+//    if (robotScene != nullptr)
+//    {
+//        if (!robotScene->HasMeshes())
+//        {
+//            OMPL_ERROR("There is no mesh specified in the indicated robot resource: %s", robot.c_str());
+//            importerRobot_.resize(p);
+//        }
+//    }
+//    else
+//    {
+//        OMPL_ERROR("Unable to load robot scene: %s", robot.c_str());
+//        importerRobot_.resize(p);
+//    }
+//
+//    if (p < importerRobot_.size())
+//    {
+////        robotScene->mRootNode->mTransformation = aiMatrix4x4();
+//
+//        importerRobot_[p]->ApplyPostProcessing(aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph);
+//
+//        computeGeometrySpecification();
+//        return true;
+//    }
+//
+//    return false;
+//}
+
 bool ompl::app::RigidBodyGeometry::setEnvironmentMesh(const std::string &env)
 {
     importerEnv_.clear();
@@ -121,8 +175,56 @@ bool ompl::app::RigidBodyGeometry::addEnvironmentMesh(const std::string &env)
         return true;
     }
 
-        return false;
+    return false;
 }
+
+//bool ompl::app::RigidBodyGeometry::addEnvironmentMesh(const std::string &env)
+//{
+//    assert(!env.empty());
+//    std::size_t p = importerEnv_.size();
+//    importerEnv_.resize(p + 1);
+//    importerEnv_[p] = std::make_shared<Assimp::Importer>();
+//
+//    importerEnv_[p]->SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
+//                          aiComponent_NORMALS | aiComponent_TANGENTS_AND_BITANGENTS | aiComponent_COLORS |
+//                          aiComponent_TEXCOORDS | aiComponent_BONEWEIGHTS | aiComponent_ANIMATIONS |
+//                          aiComponent_TEXTURES | aiComponent_LIGHTS | aiComponent_CAMERAS |
+//                          aiComponent_MATERIALS);
+//
+//    const boost::filesystem::path path = findMeshFile(env);
+//    if (path.empty())
+//        OMPL_ERROR("File '%s' not found in mesh path.", env.c_str());
+//
+//    const aiScene* envScene = importerEnv_[p]->ReadFile(path.string().c_str(),
+//                                                        aiProcess_GenNormals             |
+//                                                        aiProcess_Triangulate            |
+//                                                        aiProcess_JoinIdenticalVertices  |
+//                                                        aiProcess_SortByPType            |
+//                                                        aiProcess_RemoveComponent);
+//
+//    if (envScene != nullptr)
+//    {
+//        if (!envScene->HasMeshes())
+//        {
+//            OMPL_ERROR("There is no mesh specified in the indicated environment resource: %s", env.c_str());
+//            importerEnv_.resize(p);
+//        }
+//    }
+//    else
+//    {
+//        OMPL_ERROR("Unable to load environment scene: %s", env.c_str());
+//        importerEnv_.resize(p);
+//    }
+//
+//    if (p < importerEnv_.size())
+//    {
+//        importerEnv_[p]->ApplyPostProcessing(aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph);
+//        computeGeometrySpecification();
+//        return true;
+//    }
+//    
+//    return false;
+//}
 
 ompl::base::RealVectorBounds ompl::app::RigidBodyGeometry::inferEnvironmentBounds() const
 {
@@ -180,28 +282,29 @@ aiVector3D ompl::app::RigidBodyGeometry::getRobotCenter(unsigned int robotIndex)
     return s;
 }
 
-void ompl::app::RigidBodyGeometry::setStateValidityCheckerType (CollisionChecker ctype)
+void ompl::app::RigidBodyGeometry::setCollisionChecker(CollisionChecker cchecker)
 {
-    if (ctype != ctype_)
+    if (cchecker != cchecker_)
     {
-        ctype_ = ctype;
+        cchecker_ = cchecker;
         if (validitySvc_)
         {
-            validitySvc_.reset ();
+            validitySvc_.reset();
         }
 
-        assert (!validitySvc_);
+        assert(!validitySvc_);
     }
 }
 
-const ompl::base::StateValidityCheckerPtr& ompl::app::RigidBodyGeometry::allocStateValidityChecker(const base::SpaceInformationPtr &si, const GeometricStateExtractor &se, bool selfCollision)
+const ompl::base::StateValidityCheckerPtr& ompl::app::RigidBodyGeometry::allocStateValidityChecker(const base::SpaceInformationPtr &si,
+        const base::StateSpacePtr &gspace, const GeometricStateExtractor &se, bool selfCollision)
 {
     if (validitySvc_)
         return validitySvc_;
 
     GeometrySpecification geom = getGeometrySpecification();
 
-    switch (ctype_)
+    switch (cchecker_)
     {
 #if OMPL_HAS_PQP
         case PQP:
@@ -217,9 +320,12 @@ const ompl::base::StateValidityCheckerPtr& ompl::app::RigidBodyGeometry::allocSt
             else
                 validitySvc_ = std::make_shared<FCLStateValidityChecker<Motion_3D>>(si, geom, se, selfCollision);
             break;
+        case BULLET:
+            validitySvc_ = std::make_shared<ContactStateValidityChecker>(si, mtype_, 0.05, -0.05, gspace, se, geom);
+            break;
 
         default:
-            OMPL_ERROR("Unexpected collision checker type (%d) encountered", ctype_);
+            OMPL_ERROR("Unexpected collision checker type (%d) encountered", cchecker_);
     };
 
     return validitySvc_;

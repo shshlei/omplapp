@@ -8,7 +8,7 @@
 *
 *********************************************************************/
 
-/* Author: Ioan Sucan */
+/* Author: Ioan Sucan, Shi Shenglei */
 
 #ifndef OMPLAPP_GEOMETRY_RIGID_BODY_GEOMETRY_
 #define OMPLAPP_GEOMETRY_RIGID_BODY_GEOMETRY_
@@ -26,31 +26,27 @@
 
 namespace ompl
 {
-
     /** \brief Namespace containing code specific to OMPL.app */
     namespace app
     {
-        /** \brief Enumeration of the possible collision checker types */
-        enum CollisionChecker
-            { PQP, FCL };
-
         class RigidBodyGeometry
         {
         public:
 
             /** \brief Constructor expects a state space that can represent a rigid body */
             /// \param mtype The motion model (2D or 3D) for the rigid body.
-            /// \param ctype The type of collision checker to use for rigid body planning.
+            /// \param ctype The collision type (discrete or continuous) for the rigid body.
+            /// \param cchecker The type of collision checker to use for rigid body planning.
             explicit
-            RigidBodyGeometry(MotionModel mtype, CollisionChecker ctype) : mtype_(mtype), factor_(1.0), add_(0.0), ctype_(ctype)
+            RigidBodyGeometry(MotionModel mtype, CollisionChecker cchecker) : mtype_(mtype), cchecker_(cchecker), factor_(1.0), add_(0.0)
             {
             }
 
             /// \brief Constructor expects a state space that can represent a rigid body
             /// \param mtype The motion model (2D or 3D) for the rigid body.
-            /// \remarks This constructor defaults to a PQP state validity checker
+            /// \remarks This constructor defaults to a BULLET state validity checker
             explicit
-            RigidBodyGeometry(MotionModel mtype) : mtype_(mtype), factor_(1.0), add_(0.0), ctype_(FCL)
+            RigidBodyGeometry(MotionModel mtype) : mtype_(mtype), cchecker_(BULLET), factor_(1.0), add_(0.0)
             {
             }
 
@@ -61,9 +57,12 @@ namespace ompl
                 return mtype_;
             }
 
-            CollisionChecker getCollisionCheckerType() const
+            /** \brief Change the type of collision checking for the rigid body */
+            virtual void setCollisionChecker(CollisionChecker cchecker);
+
+            CollisionChecker getCollisionChecker() const
             {
-                return ctype_;
+                return cchecker_;
             }
 
             bool hasEnvironment() const
@@ -102,11 +101,9 @@ namespace ompl
                 file representing a part of the robot (\e robot). Returns 1 on success, 0 on failure. */
             virtual bool addRobotMesh(const std::string &robot);
 
-            /** \brief Change the type of collision checking for the rigid body */
-            virtual void setStateValidityCheckerType (CollisionChecker ctype);
-
             /** \brief Allocate default state validity checker using FCL. */
-            const base::StateValidityCheckerPtr& allocStateValidityChecker(const base::SpaceInformationPtr &si, const GeometricStateExtractor &se, bool selfCollision);
+            const base::StateValidityCheckerPtr& allocStateValidityChecker(const base::SpaceInformationPtr &si,
+                    const base::StateSpacePtr &gspace, const GeometricStateExtractor &se, bool selfCollision);
 
             const GeometrySpecification& getGeometrySpecification() const;
 
@@ -163,6 +160,9 @@ namespace ompl
 
             MotionModel         mtype_;
 
+            /** \brief Value containing the type of collision checking to use */
+            CollisionChecker    cchecker_;
+
             /** \brief The factor to multiply inferred environment bounds by (default 1) */
             double              factor_;
 
@@ -181,13 +181,9 @@ namespace ompl
             /** \brief Instance of the state validity checker for collision checking */
             base::StateValidityCheckerPtr validitySvc_;
 
-            /** \brief Value containing the type of collision checking to use */
-            CollisionChecker              ctype_;
-
             /** \brief Paths to search for mesh files if mesh file names do not correspond to
              * absolute paths */
             std::vector<boost::filesystem::path> meshPath_{OMPLAPP_RESOURCE_DIR};
-
         };
 
     }

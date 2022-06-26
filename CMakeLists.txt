@@ -15,6 +15,10 @@ endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+if(POLICY CMP0012)
+  cmake_policy(SET CMP0012 NEW)
+endif()
+
 set(CMAKE_MODULE_PATH
     "${CMAKE_MODULE_PATH}"
     "${CMAKE_ROOT_DIR}/cmake/Modules"
@@ -145,7 +149,11 @@ set_package_properties(fcl PROPERTIES
     URL "https://github.com/flexible-collision-library/fcl"
     PURPOSE "The default collision checking library.")
 find_package(octomap QUIET)
-find_package(fcl REQUIRED)
+find_package(fcl 0.7 REQUIRED)
+add_definitions(-DB2_USE_DOUBLE_PRECISION)
+add_definitions(-DBT_USE_DOUBLE_PRECISION)
+find_package(Bullet REQUIRED)
+find_package(Box2DCollision REQUIRED)
 set_package_properties(Threads PROPERTIES
     URL "https://en.wikipedia.org/wiki/POSIX_Threads"
     PURPOSE "Pthreads is sometimes needed, depending on OS / compiler.")
@@ -179,24 +187,30 @@ include_directories(
     "${OMPL_INCLUDE_DIRS}"
     "${EIGEN3_INCLUDE_DIR}"
     "${FCL_INCLUDE_DIRS}"
+    "${BULLET_INCLUDE_DIRS}"
+    "${Box2DCollision_INCLUDE_DIR}"
     "${ASSIMP_INCLUDE_DIRS}")
 
 # ROS installs fcl in /usr. In /usr/include/fcl/config.h it says octomap was
 # enabled. Octomap is installed in /opt/ros/${ROS_DISTRO}/include (most
 # likely), but fcl.pc doesn't have that information, so we just add it to the
 # include path.
-if(DEFINED ENV{ROS_DISTRO})
-    include_directories("/opt/ros/$ENV{ROS_DISTRO}/include")
-endif()
+# if(DEFINED ENV{ROS_DISTRO})
+#     include_directories("/opt/ros/$ENV{ROS_DISTRO}/include")
+# endif()
 
 set(OMPLAPP_MODULE_LIBRARIES
     ${OPENGL_LIBRARIES}
     ${ASSIMP_LIBRARY}
-    ${FCL_LIBRARIES})
+    ${FCL_LIBRARIES}
+    ${BULLET_LIBRARIES}
+    ${Box2DCollision_LIBRARY})
 set(OMPLAPP_LIBRARIES
     ${OPENGL_LIBRARIES}
     ${ASSIMP_LIBRARIES}
-    ${FCL_LIBRARIES})
+    ${FCL_LIBRARIES}
+    ${Box2DCollision_LIBRARY}
+    ${BULLET_LIBRARIES})
 link_directories(${ASSIMP_LIBRARY_DIRS} ${CCD_LIBRARY_DIRS} ${OCTOMAP_LIBRARY_DIRS} ${FCL_LIBRARY_DIRS})
 
 if (OPENGL_INCLUDE_DIR)
@@ -253,13 +267,13 @@ add_subdirectory(ompl/doc)
 add_subdirectory(ompl/src)
 add_subdirectory(ompl/py-bindings)
 add_subdirectory(ompl/tests)
-add_subdirectory(ompl/demos)
+#add_subdirectory(ompl/demos)
 add_subdirectory(ompl/scripts)
 add_subdirectory(gui)
 add_subdirectory(doc)
 add_subdirectory(src)
 add_subdirectory(demos)
-add_subdirectory(benchmark)
+#add_subdirectory(benchmark)
 add_subdirectory(py-bindings)
 
 install(DIRECTORY resources

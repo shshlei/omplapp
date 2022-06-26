@@ -1,8 +1,8 @@
 # create a library with the common parts of applications
-file(GLOB ompl_app_base_SRC geometry/*.cpp geometry/detail/*.cpp apps/*.cpp apps/detail/*.cpp)
+file(GLOB ompl_app_base_SRC geometry/*.cpp geometry/detail/*.cpp collision/*.cpp apps/*.cpp apps/detail/*.cpp)
 file(GLOB ompl_app_SRC apps/graphical/*.cpp graphics/*.cpp graphics/detail/*.cpp)
 
-file(GLOB ompl_app_base_HDRS geometry/*.h geometry/detail/*.h apps/*.h apps/detail/*.h)
+file(GLOB ompl_app_base_HDRS geometry/*.h geometry/detail/*.h geometry/geometries/*.h collision/*.h apps/*.h apps/detail/*.h)
 file(GLOB ompl_app_HDRS apps/graphical/*.h graphics/*.h graphics/detail/*.h)
 source_group("OMPL.app Source" FILES "${ompl_app_base_SRC};${ompl_app_SRC}")
 source_group("OMPL.app Headers" FILES "${ompl_app_base_HDRS};${ompl_app_HDRS}")

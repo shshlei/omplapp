@@ -8,7 +8,7 @@
 *
 *********************************************************************/
 
-/* Author: Ioan Sucan */
+/* Author: Ioan Sucan, Shi Shenglei */
 
 #ifndef OMPLAPP_GEOMETRY_GEOMETRY_SPECIFICATION_
 #define OMPLAPP_GEOMETRY_GEOMETRY_SPECIFICATION_
@@ -26,6 +26,9 @@ namespace ompl
 
         /// Specify whether bodies are moving in 2D or bodies moving in 3D
         enum MotionModel { Motion_2D, Motion_3D };
+
+        /** \brief Enumeration of the possible collision checker types */
+        enum CollisionChecker { PQP, FCL, BULLET};
 
         using GeometricStateExtractor = std::function<const base::State *(const base::State *, unsigned int)>;
 

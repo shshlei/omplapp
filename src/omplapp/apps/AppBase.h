@@ -107,10 +107,12 @@ namespace ompl
 
                 inferProblemDefinitionBounds();
 
-                const base::StateValidityCheckerPtr &svc = allocStateValidityChecker(AppTypeSelector<T>::SimpleSetup::si_,
-                                                                                     getGeometricStateExtractor(), isSelfCollisionEnabled());
-                if (AppTypeSelector<T>::SimpleSetup::si_->getStateValidityChecker() != svc)
+                if (!AppTypeSelector<T>::SimpleSetup::si_->getStateValidityChecker())
+                {
+                    const base::StateValidityCheckerPtr &svc = allocStateValidityChecker(AppTypeSelector<T>::SimpleSetup::si_, getGeometricComponentStateSpace(),
+                                                                                         getGeometricStateExtractor(), isSelfCollisionEnabled());
                     AppTypeSelector<T>::SimpleSetup::si_->setStateValidityChecker(svc);
+                }
 
                 AppTypeSelector<T>::SimpleSetup::getStateSpace()->setup();
 

@@ -81,8 +81,8 @@ class ompl_app_generator_t(code_generator_t):
         rb.add_registration_code('def("setRobotMesh",&::ompl::app::RigidBodyGeometry::setRobotMesh)')
         rb.member_function('addRobotMesh').exclude()
         rb.add_registration_code('def("addRobotMesh",&::ompl::app::RigidBodyGeometry::addRobotMesh)')
-        rb.member_function('setStateValidityCheckerType').exclude()
-        rb.add_registration_code('def("setStateValidityCheckerType",&::ompl::app::RigidBodyGeometry::setStateValidityCheckerType)')
+        rb.member_function('setCollisionChecker').exclude()
+        rb.add_registration_code('def("setCollisionChecker",&::ompl::app::RigidBodyGeometry::setCollisionChecker)')
 
 if __name__ == '__main__':
     sys.setrecursionlimit(50000)

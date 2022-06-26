@@ -11,12 +11,14 @@
 /* Author: Ioan Sucan */
 
 #include "omplapp/apps/detail/appUtil.h"
+#include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/base/spaces/SE2StateSpace.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
 #include <ompl/control/planners/syclop/GridDecomposition.h>
 #include <ompl/base/objectives/MaximizeMinClearanceObjective.h>
 #include <ompl/base/objectives/MechanicalWorkOptimizationObjective.h>
 #include <ompl/base/objectives/PathLengthOptimizationObjective.h>
+#include "ompl/tools/config/MagicConstants.h"
 #include <limits>
 #include <utility>
 
@@ -24,7 +26,9 @@ void ompl::app::InferProblemDefinitionBounds(const base::ProblemDefinitionPtr &p
                                              unsigned int robotCount, const base::StateSpacePtr &space, MotionModel mtype)
 {
     // update the bounds based on start states, if needed
-    base::RealVectorBounds bounds = mtype == Motion_2D ? space->as<base::SE2StateSpace>()->getBounds() : space->as<base::SE3StateSpace>()->getBounds();
+    base::RealVectorBounds bounds = mtype == Motion_2D ?
+        (space->getType() == base::STATE_SPACE_REAL_VECTOR ? space->as<base::RealVectorStateSpace>()->getBounds() : space->as<base::SE2StateSpace>()->getBounds()) :
+        space->as<base::SE3StateSpace>()->getBounds();
 
     std::vector<const base::State*> states;
     pdef->getInputStates(states);
@@ -40,8 +44,11 @@ void ompl::app::InferProblemDefinitionBounds(const base::ProblemDefinitionPtr &p
         for (unsigned int r = 0 ; r < robotCount ; ++r)
         {
             const base::State *s = se(state, r);
-            double x = mtype == Motion_2D ? s->as<base::SE2StateSpace::StateType>()->getX() : s->as<base::SE3StateSpace::StateType>()->getX();
-            double y = mtype == Motion_2D ? s->as<base::SE2StateSpace::StateType>()->getY() : s->as<base::SE3StateSpace::StateType>()->getY();
+            double x = mtype == Motion_2D ? (space->getType() == base::STATE_SPACE_REAL_VECTOR ? s->as<base::RealVectorStateSpace::StateType>()->values[0] :
+                                             s->as<base::SE2StateSpace::StateType>()->getX()) :
+                                            s->as<base::SE3StateSpace::StateType>()->getX();
+            double y = mtype == Motion_2D ? (space->getType() == base::STATE_SPACE_REAL_VECTOR ? s->as<base::RealVectorStateSpace::StateType>()->values[1] :
+                                             s->as<base::SE2StateSpace::StateType>()->getY()) : s->as<base::SE3StateSpace::StateType>()->getY();
             double z = mtype == Motion_2D ? 0.0 : s->as<base::SE3StateSpace::StateType>()->getZ();
             if (minX > x) minX = x;
             if (maxX < x) maxX = x;
@@ -69,21 +76,44 @@ void ompl::app::InferProblemDefinitionBounds(const base::ProblemDefinitionPtr &p
         space->as<base::SE3StateSpace>()->setBounds(bounds);
     }
     else
-        space->as<base::SE2StateSpace>()->setBounds(bounds);
+    {
+        if (space->getType() == ompl::base::STATE_SPACE_REAL_VECTOR)
+            space->as<base::RealVectorStateSpace>()->setBounds(bounds);
+        else
+            space->as<base::SE2StateSpace>()->setBounds(bounds);
+    }
 }
 
 void ompl::app::InferEnvironmentBounds(const base::StateSpacePtr &space, const RigidBodyGeometry &rbg)
 {
-    MotionModel mtype = rbg.getMotionModel();
-
-    base::RealVectorBounds bounds = mtype == Motion_2D ? space->as<base::SE2StateSpace>()->getBounds() : space->as<base::SE3StateSpace>()->getBounds();
+    bool valid = true;
+    if (space->getType() == ompl::base::STATE_SPACE_REAL_VECTOR)
+    {
+        base::RealVectorBounds bounds = space->as<base::RealVectorStateSpace>()->getBounds();
+        if (bounds.getVolume() < std::numeric_limits<double>::epsilon())
+            valid = false;
+    }
+    else if (space->getType() == ompl::base::STATE_SPACE_SE2)
+    {
+        base::RealVectorBounds bounds = space->as<base::SE2StateSpace>()->getBounds();
+        if (bounds.getVolume() < std::numeric_limits<double>::epsilon())
+            valid = false;
+    }
+    else if (space->getType() == ompl::base::STATE_SPACE_SE3)
+    {
+        base::RealVectorBounds bounds = space->as<base::SE3StateSpace>()->getBounds();
+        if (bounds.getVolume() < std::numeric_limits<double>::epsilon())
+            valid = false;
+    }
 
     // if bounds are not valid
-    if (bounds.getVolume() < std::numeric_limits<double>::epsilon())
+    if (!valid)
     {
-        if (mtype == Motion_2D)
+        if (space->getType() == ompl::base::STATE_SPACE_REAL_VECTOR)
+            space->as<base::RealVectorStateSpace>()->setBounds(rbg.inferEnvironmentBounds());
+        else if (space->getType() == ompl::base::STATE_SPACE_SE2)
             space->as<base::SE2StateSpace>()->setBounds(rbg.inferEnvironmentBounds());
-        else
+        else if (space->getType() == ompl::base::STATE_SPACE_SE3)
             space->as<base::SE3StateSpace>()->setBounds(rbg.inferEnvironmentBounds());
     }
 }
@@ -94,6 +124,54 @@ namespace ompl
     {
         namespace detail
         {
+            class GeometricStateProjectorRealVector2D : public base::ProjectionEvaluator
+            {
+            public:
+
+                GeometricStateProjectorRealVector2D(const base::StateSpacePtr &space, const base::StateSpacePtr &gspace, GeometricStateExtractor se) :
+                    base::ProjectionEvaluator(space), gm_(gspace->as<base::RealVectorStateSpace>()), se_(std::move(se))
+                {
+                }
+
+                unsigned int getDimension() const override
+                {
+                    return 2 * space_->getSubspaceCount();
+                }
+
+                void project(const base::State *state, Eigen::Ref<Eigen::VectorXd> projection) const override
+                {
+                    for (std::size_t i = 0; i < space_->getSubspaceCount(); i++)
+                    {
+                        const base::State *gs = se_(state, i);
+                        projection(2*i) = gs->as<base::RealVectorStateSpace::StateType>()->values[0];
+                        projection(2*i+1) = gs->as<base::RealVectorStateSpace::StateType>()->values[1];
+                    }
+                }
+
+                void defaultCellSizes() override
+                {
+                    const auto bounds = gm_->getBounds();
+                    const std::vector<double> b = bounds.getDifference();
+                    cellSizes_.resize(getDimension());
+                    bounds_.resize(getDimension());
+                    for (std::size_t i = 0; i < space_->getSubspaceCount(); i++)
+                    {
+                        bounds_.setLow(2*i, bounds.low[0]);
+                        bounds_.setLow(2*i+1, bounds.low[1]);
+                        bounds_.setHigh(2*i, bounds.high[0]);
+                        bounds_.setHigh(2*i+1, bounds.high[1]);
+                        cellSizes_[2*i] = b[0] / magic::PROJECTION_DIMENSION_SPLITS;
+                        cellSizes_[2*i+1] = b[1] / magic::PROJECTION_DIMENSION_SPLITS;
+                    }
+                }
+
+            protected:
+
+                const base::RealVectorStateSpace *gm_;
+                GeometricStateExtractor    se_;
+
+            };
+
             class GeometricStateProjector2D : public base::ProjectionEvaluator
             {
             public:
@@ -104,23 +182,34 @@ namespace ompl
 
                 unsigned int getDimension() const override
                 {
-                    return 2;
+                    return 2 * space_->getSubspaceCount();
                 }
 
                 void project(const base::State *state, Eigen::Ref<Eigen::VectorXd> projection) const override
                 {
-                    const base::State *gs = se_(state, 0);
-                    projection(0) = gs->as<base::SE2StateSpace::StateType>()->getX();
-                    projection(1) = gs->as<base::SE2StateSpace::StateType>()->getY();
+                    for (std::size_t i = 0; i < space_->getSubspaceCount(); i++)
+                    {
+                        const base::State *gs = se_(state, i);
+                        projection(2*i) = gs->as<base::SE2StateSpace::StateType>()->getX();
+                        projection(2*i+1) = gs->as<base::SE2StateSpace::StateType>()->getY();
+                    }
                 }
 
                 void defaultCellSizes() override
                 {
-                    bounds_ = gm_->getBounds();
-                    const std::vector<double> b = bounds_.getDifference();
-                    cellSizes_.resize(2);
-                    cellSizes_[0] = b[0] / 20.0;
-                    cellSizes_[1] = b[1] / 20.0;
+                    const auto bounds = gm_->getBounds();
+                    const std::vector<double> b = bounds.getDifference();
+                    cellSizes_.resize(getDimension());
+                    bounds_.resize(getDimension());
+                    for (std::size_t i = 0; i < space_->getSubspaceCount(); i++)
+                    {
+                        bounds_.setLow(2*i, bounds.low[0]);
+                        bounds_.setLow(2*i+1, bounds.low[1]);
+                        bounds_.setHigh(2*i, bounds.high[0]);
+                        bounds_.setHigh(2*i+1, bounds.high[1]);
+                        cellSizes_[2*i] = b[0] / magic::PROJECTION_DIMENSION_SPLITS;
+                        cellSizes_[2*i+1] = b[1] / magic::PROJECTION_DIMENSION_SPLITS;
+                    }
                 }
 
             protected:
@@ -140,25 +229,38 @@ namespace ompl
 
                 unsigned int getDimension() const override
                 {
-                    return 3;
+                    return 3 * space_->getSubspaceCount();
                 }
 
                 void project(const base::State *state, Eigen::Ref<Eigen::VectorXd> projection) const override
                 {
-                    const base::State *gs = se_(state, 0);
-                    projection(0) = gs->as<base::SE3StateSpace::StateType>()->getX();
-                    projection(1) = gs->as<base::SE3StateSpace::StateType>()->getY();
-                    projection(2) = gs->as<base::SE3StateSpace::StateType>()->getZ();
+                    for (std::size_t i = 0; i < space_->getSubspaceCount(); i++)
+                    {
+                        const base::State *gs = se_(state, i);
+                        projection(3*i) = gs->as<base::SE3StateSpace::StateType>()->getX();
+                        projection(3*i+1) = gs->as<base::SE3StateSpace::StateType>()->getY();
+                        projection(3*i+2) = gs->as<base::SE3StateSpace::StateType>()->getZ();
+                    }
                 }
 
                 void defaultCellSizes() override
                 {
-                    bounds_ = gm_->getBounds();
+                    const auto bounds = gm_->getBounds();
                     const std::vector<double> b = bounds_.getDifference();
-                    cellSizes_.resize(3);
-                    cellSizes_[0] = b[0] / 20.0;
-                    cellSizes_[1] = b[1] / 20.0;
-                    cellSizes_[2] = b[2] / 20.0;
+                    cellSizes_.resize(getDimension());
+                    bounds_.resize(getDimension());
+                    for (std::size_t i = 0; i < space_->getSubspaceCount(); i++)
+                    {
+                        bounds_.low[3*i] = bounds.low[0];
+                        bounds_.low[3*i+1] = bounds.low[1];
+                        bounds_.low[3*i+2] = bounds.low[2];
+                        bounds_.high[3*i] = bounds.high[0];
+                        bounds_.high[3*i+1] = bounds.high[1];
+                        bounds_.high[3*i+2] = bounds.high[2];
+                        cellSizes_[3*i] = b[0] / magic::PROJECTION_DIMENSION_SPLITS;
+                        cellSizes_[3*i+1] = b[1] / magic::PROJECTION_DIMENSION_SPLITS;
+                        cellSizes_[3*i+2] = b[2] / magic::PROJECTION_DIMENSION_SPLITS;
+                    }
                 }
 
             protected:
@@ -238,7 +340,12 @@ ompl::base::ProjectionEvaluatorPtr ompl::app::allocGeometricStateProjector(const
                                                                            const base::StateSpacePtr &gspace, const GeometricStateExtractor &se)
 {
     if (mtype == Motion_2D)
-        return std::make_shared<detail::GeometricStateProjector2D>(space, gspace, se);
+    {
+        if (gspace->getType() == ompl::base::STATE_SPACE_REAL_VECTOR)
+            return std::make_shared<detail::GeometricStateProjectorRealVector2D>(space, gspace, se);
+        else
+            return std::make_shared<detail::GeometricStateProjector2D>(space, gspace, se);
+    }
     return std::make_shared<detail::GeometricStateProjector3D>(space, gspace, se);
 }
 
