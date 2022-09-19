@@ -25,7 +25,7 @@
 #include <ompl/geometric/planners/bispace/RRTBispace.h>
 #include <ompl/geometric/planners/kpiece/BKPIECE1.h>
 #include <ompl/geometric/planners/kpiece/LBKPIECE1.h>
-//#include <ompl/geometric/planners/ase/BiASE.h>
+#include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
 #include <ompl/geometric/planners/hsc/BiHSCCell.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
@@ -42,7 +42,7 @@
 #include <ompl/geometric/planners/rrt/SORRTstar.h>
 #include <ompl/geometric/planners/bispace/CellBispacestar.h>
 #include <ompl/geometric/planners/bispace/RRTBispacestar.h>
-//#include <ompl/geometric/planners/ase/BiASEstar.h>
+#include <ompl/geometric/planners/ase/BiASEstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCCellstar.h>
 //#include <ompl/geometric/planners/hsc/HSCASEstar.h>
@@ -256,30 +256,28 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
-        /*
         case PLANNER_BIASE:
         {
             auto planner = std::make_shared<og::BiASE>(si);
-            planner->setLazyNode(true);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
-
+            if (params.hasParam(std::string("pen_distance")))
+                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
             return planner;
             break;
         }
         case PLANNER_BIASESTAR:
         {
             auto planner = std::make_shared<og::BiASEstar>(si);
-            planner->setLazyNode(true);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
-
+            if (params.hasParam(std::string("pen_distance")))
+                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
             return planner;
             break;
         }
-        */
         case PLANNER_BIHSC:
         {
             auto planner = std::make_shared<og::BiHSC>(si);
@@ -471,6 +469,70 @@ void envBarriers(bool optimal, bool /*default_param*/, app::SE2RigidBodyPlanning
     pen_distance = 0.0;
 }
 
+void envRandomPolygons(bool optimal, bool /*default_param*/, app::SE2RigidBodyPlanning &setup, double &range, double &pen_distance)
+{
+    std::string robot_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/2D/car2_planar_robot.dae";
+    std::string env_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/2D/RandomPolygons_planar_env.dae";
+    setup.setRobotMesh(robot_fname);
+    setup.setEnvironmentMesh(env_fname);
+
+    base::ScopedState<base::SE2StateSpace> start(setup.getSpaceInformation());
+    start->setX(-32.99);
+    start->setY(42.85);
+    start->setYaw(0.0);
+
+    // define goal state
+    base::ScopedState<base::SE2StateSpace> goal(start);
+    goal->setX(14.01);
+    goal->setY(-43.15);
+    goal->setYaw(0.802851455917);
+
+    setup.setStartAndGoalStates(start, goal);
+    setup.getSpaceInformation()->setStateValidityCheckingResolution(0.01);
+    if (optimal)
+    {
+        auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
+        obj->setCostThreshold(base::Cost(110.0));
+        setup.setOptimizationObjective(obj);
+    }
+    setup.setup();
+
+    range = 0.0;
+    pen_distance = 0.0;
+}
+
+void envBugTrap(bool optimal, bool /*default_param*/, app::SE2RigidBodyPlanning &setup, double &range, double &pen_distance)
+{
+    std::string robot_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/2D/car1_planar_robot.dae";
+    std::string env_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/2D/BugTrap_planar_env.dae";
+    setup.setRobotMesh(robot_fname);
+    setup.setEnvironmentMesh(env_fname);
+
+    base::ScopedState<base::SE2StateSpace> start(setup.getSpaceInformation());
+    start->setX(6.0);
+    start->setY(12.0);
+    start->setYaw(0.0);
+
+    // define goal state
+    base::ScopedState<base::SE2StateSpace> goal(start);
+    goal->setX(-39.0);
+    goal->setY(0.0);
+    goal->setYaw(0.0);
+
+    setup.setStartAndGoalStates(start, goal);
+    setup.getSpaceInformation()->setStateValidityCheckingResolution(0.01);
+    if (optimal)
+    {
+        auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
+        obj->setCostThreshold(base::Cost(135.0));
+        setup.setOptimizationObjective(obj);
+    }
+    setup.setup();
+
+    range = 0.0;
+    pen_distance = 0.0;
+}
+
 // Parse the command-line arguments
 bool argParse(int argc, char** argv, double *runTimePtr, PlannerType *plannerPtr, bool &optimal, std::string &env, bool &default_param, unsigned int &run_cycle);
 
@@ -496,6 +558,10 @@ int main(int argc, char* argv[])
         envMaze(optimal, default_param, setup, range, pen_distance);
     else if (env == "Barriers")
         envBarriers(optimal, default_param, setup, range, pen_distance);
+    else if (env == "RandomPolygons")
+        envRandomPolygons(optimal, default_param, setup, range, pen_distance);
+    else if (env == "BugTrap")
+        envBugTrap(optimal, default_param, setup, range, pen_distance);
 
     auto si = setup.getSpaceInformation();
     auto svc = std::make_shared<app::ContactStateValidityChecker>(si, setup.getMotionModel(), 0.05, -0.05,
@@ -540,7 +606,7 @@ bool argParse(int argc, char** argv, double* runTimePtr, PlannerType *plannerPtr
     bpo::options_description desc("Allowed options");
     desc.add_options()
         ("help,h", "produce help message")
-        ("env,e", bpo::value<std::string>()->default_value("Maze"), "(Optional) Specify the Benchmark environment, defaults to Maze if not given. Valid options are Maze, Barriers.")
+        ("env,e", bpo::value<std::string>()->default_value("Maze"), "(Optional) Specify the Benchmark environment, defaults to Maze if not given. Valid options are Maze, Barriers, RandomPolygons, BugTrap.")
         ("default_param,d", bpo::value<bool>()->default_value(false), "(Optional) Specify if the planner is set the default params.")
         ("runtime,t", bpo::value<double>()->default_value(1.0), "(Optional) Specify the runtime in seconds. Defaults to 1 and must be greater than 0.")
         ("planner,p", bpo::value<std::string>()->default_value("RRTstar"), "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are BFMTstar, BITstar, CForest, FMTstar, InformedRRTstar, PRMstar, RRTstar, SORRTstar, RRT, RRTConnect, BKPIECE1, LBKPIECE1, CellBispace, CellBispacestar, RRTBispace, RRTBispacestar, BiASE, BiASEstar, BiHSC, BiHSCstar, BiHSCCell, BiHSCCellstar, HSCASE, HSCASEstar, SBL, LSCAI, LSCAIstar.")
@@ -580,6 +646,14 @@ bool argParse(int argc, char** argv, double* runTimePtr, PlannerType *plannerPtr
     else if (boost::iequals("Barriers", envStr))
     {
         env = "Barriers";
+    }
+    else if (boost::iequals("RandomPolygons", envStr))
+    {
+        env = "RandomPolygons";
+    }
+    else if (boost::iequals("BugTrap", envStr))
+    {
+        env = "BugTrap";
     }
     else
     {

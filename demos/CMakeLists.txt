@@ -37,6 +37,7 @@ if (OMPL_BUILD_DEMOS)
     add_omplapp_demo(demo_TestGraphRemoveNodeVSClearAdd TestGraphRemoveNodeVSClearAdd.cpp)
 
     add_omplapp_demo(demo_RandomPolygonCircles RandomPolygonCircles/RandomPolygonCirclesPlanning.cpp)
+    add_omplapp_demo(demo_RandomPolygonCirclesBenchmark RandomPolygonCircles/RandomPolygonCirclesBenchmark.cpp)
     add_omplapp_demo(demo_RealVector2RigidBodyPlanning RealVector2RigidBodyPlanning/RealVector2RigidBodyPlanning.cpp)
 
     add_omplapp_demo(demo_MaxDistance SE2MaxDistance.cpp)

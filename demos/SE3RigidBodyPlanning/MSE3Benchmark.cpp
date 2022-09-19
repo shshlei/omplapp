@@ -15,7 +15,7 @@
 #include <ompl/geometric/planners/stride/STRIDE.h>
 #include <ompl/geometric/planners/bispace/CellBispace.h>
 #include <ompl/geometric/planners/bispace/RRTBispace.h>
-//#include <ompl/geometric/planners/ase/BiASE.h>
+#include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
 
@@ -33,7 +33,7 @@
 #include <ompl/geometric/planners/sst/SST.h>
 #include <ompl/geometric/planners/bispace/CellBispacestar.h>
 #include <ompl/geometric/planners/bispace/RRTBispacestar.h>
-//#include <ompl/geometric/planners/ase/BiASEstar.h>
+#include <ompl/geometric/planners/ase/BiASEstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCstar.h>
 //#include <ompl/geometric/planners/hsc/HSCASEstar.h>
 
@@ -90,7 +90,7 @@ void benchmarkHome(bool optimal, std::string &benchmark_name, app::SE3RigidBodyP
     }
     setup.setup();
 
-    runtime_limit = 500.0;
+    runtime_limit = 200.0;
     memory_limit = 10000.0;  // set high because memory usage is not always estimated correctly
     run_count = 20;
     if (optimal)
@@ -254,7 +254,7 @@ void benchmarkAbstract(bool optimal, std::string &benchmark_name, app::SE3RigidB
     }
     setup.setup();
 
-    runtime_limit = 500.0;
+    runtime_limit = 50.0;
     memory_limit = 10000.0;  // set high because memory usage is not always estimated correctly
     run_count = 20;
     if (optimal)
@@ -343,6 +343,47 @@ void benchmarkApartmentReverse(bool optimal, std::string &benchmark_name, app::S
         runtime_limit = 2000.0;
 }
 
+void benchmarkPipedream(bool optimal, std::string &benchmark_name, app::SE3RigidBodyPlanning &setup, double &runtime_limit,
+                double &memory_limit, int &run_count)
+{
+    if (optimal)
+        benchmark_name = std::string("OptimalApartmentReverse");
+    else 
+        benchmark_name = std::string("FeasibleApartmentReverse");
+    std::string robot_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/3D/Apartment_robot.dae";
+    std::string env_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/3D/Apartment_env.dae";
+    setup.setRobotMesh(robot_fname);
+    setup.setEnvironmentMesh(env_fname);
+
+    base::ScopedState<base::SE3StateSpace> start(setup.getSpaceInformation());
+    start->setX(241.81); // apartment-reverse 
+    start->setY(106.15);
+    start->setZ(36.46);
+    start->rotation().setIdentity();
+
+    base::ScopedState<base::SE3StateSpace> goal(start);
+    goal->setX(-31.19); // apartment-reverse 
+    goal->setY(-99.85);
+    goal->setZ(36.46);
+    goal->rotation().setIdentity();
+
+    setup.setStartAndGoalStates(start, goal);
+    setup.getSpaceInformation()->setStateValidityCheckingResolution(0.01);
+    if (optimal)
+    {
+        auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
+        obj->setCostThreshold(base::Cost(500.0));
+        setup.setOptimizationObjective(obj);
+    }
+    setup.setup();
+
+    runtime_limit = 500.0;
+    memory_limit = 10000.0;  // set high because memory usage is not always estimated correctly
+    run_count = 20;
+    if (optimal)
+        runtime_limit = 2000.0;
+}
+
 bool argParse(int argc, char** argv, std::string &env, bool &optimal);
 
 int main(int argc, char* argv[])
@@ -353,9 +394,7 @@ int main(int argc, char* argv[])
 
     // Parse the arguments, returns true if successful, false otherwise
     if (!argParse(argc, argv, env, optimal))
-    {
         return -1;
-    }
 
     ompl::app::SE3RigidBodyPlanning setup;
     std::string benchmark_name;
@@ -382,7 +421,7 @@ int main(int argc, char* argv[])
             setup.getGeometricComponentStateSpace(), setup.getGeometricStateExtractor(), setup.getGeometrySpecification());
     setup.setStateValidityChecker(svc);
 
-    ompl::tools::Benchmark::Request request(runtime_limit, memory_limit, run_count, 0.5, true, true, false);
+    ompl::tools::Benchmark::Request request(runtime_limit, memory_limit, run_count, 0.2, true, true, false);
     ompl::tools::Benchmark b(setup, benchmark_name);
 
     if (optimal)
@@ -390,12 +429,10 @@ int main(int argc, char* argv[])
         /*
         addPlanner(b, std::make_shared<ompl::geometric::RRTstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::InformedRRTstar>(si));
-        */
-        /*
+        addPlanner(b, std::make_shared<ompl::geometric::BITstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::PRMstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LazyPRMstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LBTRRT>(si));
-        addPlanner(b, std::make_shared<ompl::geometric::BITstar>(si));
         */
 
         /*
@@ -443,12 +480,13 @@ int main(int argc, char* argv[])
         }
         */
 
-        /*
+
         {
             auto planner = std::make_shared<ompl::geometric::BiASEstar>(si);
             addPlanner(b, planner);
         }
 
+        /*
         {
             auto planner = std::make_shared<ompl::geometric::BiASEstar>(si);
             planner->setLazyNode(true);
@@ -456,6 +494,7 @@ int main(int argc, char* argv[])
         }
         */
 
+        /*
         {
             auto planner = std::make_shared<ompl::geometric::BiHSCstar>(si);
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
@@ -465,7 +504,6 @@ int main(int argc, char* argv[])
             addPlanner(b, planner);
         }
 
-        /*
         {
             auto planner = std::make_shared<ompl::geometric::HSCASEstar>(si);
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
@@ -495,9 +533,9 @@ int main(int argc, char* argv[])
     }
     else 
     {
+        /*
         addPlanner(b, std::make_shared<ompl::geometric::RRTConnect>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LBKPIECE1>(si));
-        /*
         addPlanner(b, std::make_shared<ompl::geometric::RRT>(si));
         addPlanner(b, std::make_shared<ompl::geometric::PRM>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LazyRRT>(si));
@@ -506,7 +544,7 @@ int main(int argc, char* argv[])
         addPlanner(b, std::make_shared<ompl::geometric::BKPIECE1>(si));
         addPlanner(b, std::make_shared<ompl::geometric::STRIDE>(si));
         */
-
+        addPlanner(b, std::make_shared<ompl::geometric::RRT>(si));
         /*
         {
             auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
@@ -539,18 +577,22 @@ int main(int argc, char* argv[])
         */
 
         /*
+        for (unsigned int i = 20; i <= 90; i+= 10)
         {
             auto planner = std::make_shared<ompl::geometric::BiASE>(si);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::BiASE>(si);
-            planner->setLazyNode(true);
+            planner->setNumI(i);
             addPlanner(b, planner);
         }
         */
 
+        /*
+        {
+            auto planner = std::make_shared<ompl::geometric::BiASE>(si);
+            addPlanner(b, planner);
+        }
+        */
+
+        /*
         {
             auto planner = std::make_shared<ompl::geometric::BiHSC>(si);
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
@@ -560,7 +602,6 @@ int main(int argc, char* argv[])
             addPlanner(b, planner);
         }
 
-        /*
         {
             auto planner = std::make_shared<ompl::geometric::BiHSC>(si);
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
@@ -608,8 +649,10 @@ int main(int argc, char* argv[])
     }
 
     b.benchmark(request);
-    b.saveResultsToFile((benchmark_name + ".log").c_str());
-
+    if (optimal)
+        b.saveResultsToFile((benchmark_name  + "biasestar" + ".log").c_str());
+    else
+        b.saveResultsToFile((benchmark_name  + "biase" + ".log").c_str());
     return 0;
 }
 

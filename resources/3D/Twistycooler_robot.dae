@@ -952,7 +952,7 @@
                 <technique sid="COMMON">
                     <lambert>
                         <diffuse>
-                            <color>0.196078431372549 0.196078431372549 1 1</color>
+                            <color>0.0 1.0 0 1</color>
                         </diffuse>
                     </lambert>
                 </technique>
@@ -963,7 +963,7 @@
                 <technique sid="COMMON">
                     <lambert>
                         <diffuse>
-                            <color>0.6784313725490196 0 0.01568627450980392 1</color>
+                            <color>0.0 1 0.0 1</color>
                         </diffuse>
                     </lambert>
                 </technique>
@@ -974,7 +974,7 @@
                 <technique sid="COMMON">
                     <constant>
                         <transparent opaque="A_ONE">
-                            <color>0.196078431372549 0.196078431372549 1 1</color>
+                            <color>0.0 1.0 0 1</color>
                         </transparent>
                         <transparency>
                             <float>1</float>
@@ -988,7 +988,7 @@
                 <technique sid="COMMON">
                     <lambert>
                         <diffuse>
-                            <color>0.4 0.09803921568627451 0 1</color>
+                            <color>0.0 1.0 0 1</color>
                         </diffuse>
                     </lambert>
                 </technique>

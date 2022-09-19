@@ -317,7 +317,6 @@ namespace ompl
                                                          // effect when positive but has an
                                                          // effect when negative
                         setCollisionShape(compound);
-                        std::size_t index = 0;
                         for (std::size_t j = 0; j < m_shapes.size(); ++j)
                         {
                             btCollisionShape* subshape = createShapePrimitive(m_shapes[j], this, static_cast<int>(j));

@@ -330,9 +330,7 @@ int main(int argc, char* argv[])
 
     // Parse the arguments, returns true if successful, false otherwise
     if (!argParse(argc, argv, env, optimal))
-    {
         return -1;
-    }
 
     ompl::app::SE3RigidBodyPlanning setup;
     std::string benchmark_name;

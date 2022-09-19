@@ -23,10 +23,11 @@
 #include <ompl/geometric/planners/rrt/LazyRRT.h>
 #include <ompl/geometric/planners/sbl/SBL.h>
 #include <ompl/geometric/planners/bispace/RRTBispace.h>
+#include <ompl/geometric/planners/bispace/RRTBispaceD.h>
 #include <ompl/geometric/planners/bispace/CellBispace.h>
 #include <ompl/geometric/planners/kpiece/BKPIECE1.h>
 #include <ompl/geometric/planners/kpiece/LBKPIECE1.h>
-//#include <ompl/geometric/planners/ase/BiASE.h>
+#include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
 #include <ompl/geometric/planners/hsc/BiHSCCell.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
@@ -43,7 +44,7 @@
 #include <ompl/geometric/planners/rrt/SORRTstar.h>
 #include <ompl/geometric/planners/bispace/RRTBispacestar.h>
 #include <ompl/geometric/planners/bispace/CellBispacestar.h>
-//#include <ompl/geometric/planners/ase/BiASEstar.h>
+#include <ompl/geometric/planners/ase/BiASEstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCCellstar.h>
 //#include <ompl/geometric/planners/hsc/HSCASEstar.h>
@@ -82,6 +83,8 @@ enum PlannerType
     PLANNER_LBKPIECE1,
     PLANNER_RRTBISPACE,
     PLANNER_RRTBISPACESTAR,
+    PLANNER_RRTBISPACED,
+    PLANNER_RRTBISPACEDSTAR,
     PLANNER_CELLBISPACE,
     PLANNER_CELLBISPACESTAR,
     PLANNER_RRTCONNECT,
@@ -238,6 +241,20 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
+        case PLANNER_RRTBISPACED:
+        {
+            auto planner = std::make_shared<og::RRTBispaceD>(si);
+            planner->setLazyPath(true);
+            planner->setLazyNode(true);
+            ompl::base::ParamSet& params = planner->params();
+            if (params.hasParam(std::string("range")))
+                params.setParam(std::string("range"), ompl::toString(range));
+            if (params.hasParam(std::string("pen_distance")))
+                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
+
+            return planner;
+            break;
+        }
         case PLANNER_CELLBISPACE:
         {
             auto planner = std::make_shared<og::CellBispace>(si);
@@ -263,7 +280,6 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
-        /*
         case PLANNER_BIASE:
         {
             auto planner = std::make_shared<og::BiASE>(si);
@@ -288,7 +304,6 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
-        */
         case PLANNER_BIHSC:
         {
             auto planner = std::make_shared<og::BiHSC>(si);
@@ -695,6 +710,84 @@ void envApartmentReverse(bool optimal, bool default_param, app::SE3RigidBodyPlan
     }
 }
 
+void envPipedream(bool optimal, bool default_param, app::SE3RigidBodyPlanning &setup, double &range, double &pen_distance)
+{
+    std::string robot_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/3D/spirelli_robot.dae";
+    std::string env_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/3D/pipedream_env.dae";
+    setup.setRobotMesh(robot_fname);
+    setup.setEnvironmentMesh(env_fname);
+
+    base::ScopedState<base::SE3StateSpace> start(setup.getSpaceInformation());
+    start->setX(54.59); 
+    start->setY(22.21);
+    start->setZ(-10.16);
+    start->rotation().setIdentity();
+
+    base::ScopedState<base::SE3StateSpace> goal(start);
+    goal->setX(69.59); 
+    goal->setY(22.21);
+    goal->setZ(13.84);
+    goal->rotation().setAxisAngle(1.0, 0.0, 0.0, 3.14159265359);
+
+    setup.setStartAndGoalStates(start, goal);
+    setup.getSpaceInformation()->setStateValidityCheckingResolution(0.01);
+    auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
+    obj->setCostThreshold(base::Cost(0.0));
+    setup.setOptimizationObjective(obj);
+    setup.setup();
+
+    pen_distance = 10.0;
+    if (optimal)
+        range = 20.0;
+    else 
+        range = 10.0;
+
+    if (default_param)
+    {
+        range = 0.0;
+        pen_distance = 0.0;
+    }
+}
+
+void envSpirelli(bool optimal, bool default_param, app::SE3RigidBodyPlanning &setup, double &range, double &pen_distance)
+{
+    std::string robot_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/3D/spirelli_robot.dae";
+    std::string env_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/3D/spirelli_env.dae";
+    setup.setRobotMesh(robot_fname);
+    setup.setEnvironmentMesh(env_fname);
+
+    base::ScopedState<base::SE3StateSpace> start(setup.getSpaceInformation());
+    start->setX(2.59); 
+    start->setY(23.21);
+    start->setZ(-32.16);
+    start->rotation().setAxisAngle(0.0, 0.0, 1.0, 3.14159265359);
+
+    base::ScopedState<base::SE3StateSpace> goal(start);
+    goal->setX(64.59); 
+    goal->setY(22.21);
+    goal->setZ(1.84);
+    goal->rotation().setAxisAngle(0.0, 1.0, 0.0, -1.57079632679);
+
+    setup.setStartAndGoalStates(start, goal);
+    setup.getSpaceInformation()->setStateValidityCheckingResolution(0.01);
+    auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
+    obj->setCostThreshold(base::Cost(0.0));
+    setup.setOptimizationObjective(obj);
+    setup.setup();
+
+    pen_distance = 10.0;
+    if (optimal)
+        range = 20.0;
+    else 
+        range = 10.0;
+
+    if (default_param)
+    {
+        range = 0.0;
+        pen_distance = 0.0;
+    }
+}
+
 // Parse the command-line arguments
 bool argParse(int argc, char** argv, double *runTimePtr, PlannerType *plannerPtr, bool &optimal, std::string &env, bool &default_param, unsigned int &run_cycle);
 
@@ -730,6 +823,10 @@ int main(int argc, char* argv[])
         envApartment(optimal, default_param, setup, range, pen_distance);
     else if (env == "ApartmentReverse")
         envApartmentReverse(optimal, default_param, setup, range, pen_distance);
+    else if (env == "Pipedream")
+        envPipedream(optimal, default_param, setup, range, pen_distance);
+    else if (env == "Spirelli")
+        envSpirelli(optimal, default_param, setup, range, pen_distance);
     
     auto si = setup.getSpaceInformation();
     auto svc = std::make_shared<app::ContactStateValidityChecker>(si, setup.getMotionModel(), 0.05, -0.05,
@@ -785,10 +882,10 @@ bool argParse(int argc, char** argv, double* runTimePtr, PlannerType *plannerPtr
     bpo::options_description desc("Allowed options");
     desc.add_options()
         ("help,h", "produce help message")
-        ("env,e", bpo::value<std::string>()->default_value("Home"), "(Optional) Specify the Benchmark environment, defaults to Home if not given. Valid options are Home, Cubicles, Twistycool, Twistycooler, Abstract, Apartment, Apartment-Reverse.")
+        ("env,e", bpo::value<std::string>()->default_value("Home"), "(Optional) Specify the Benchmark environment, defaults to Home if not given. Valid options are Home, Cubicles, Twistycool, Twistycooler, Abstract, Apartment, Apartment-Reverse, Pipedream, Spirelli.")
         ("default_param,d", bpo::value<bool>()->default_value(false), "(Optional) Specify if the planner is set the default params.")
         ("runtime,t", bpo::value<double>()->default_value(1.0), "(Optional) Specify the runtime in seconds. Defaults to 1 and must be greater than 0.")
-        ("planner,p", bpo::value<std::string>()->default_value("RRTstar"), "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are BFMTstar, BITstar, CForest, FMTstar, InformedRRTstar, PRMstar, RRTstar, SORRTstar, RRT, RRTConnect, BKPIECE1, LBKPIECE1, RRTBispace, RRTBispacestar, CellBispace, CellBispacestar, BiASE, BiASEstar, BiHSC, BiHSCstar, BiHSCCell, BiHSCCellstar, HSCASE, HSCASEstar, LazyRRT, SBL.")
+        ("planner,p", bpo::value<std::string>()->default_value("RRTstar"), "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are BFMTstar, BITstar, CForest, FMTstar, InformedRRTstar, PRMstar, RRTstar, SORRTstar, RRT, RRTConnect, BKPIECE1, LBKPIECE1, RRTBispace, RRTBispacestar, RRTBispaceD, RRTBispaceDstar, CellBispace, CellBispacestar, BiASE, BiASEstar, BiHSC, BiHSCstar, BiHSCCell, BiHSCCellstar, HSCASE, HSCASEstar, LazyRRT, SBL.")
         ("run_cycle,r", bpo::value<unsigned int>()->default_value(1), "(Optional) Specify the run cycles.");
     bpo::variables_map vm;
     bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
@@ -845,6 +942,14 @@ bool argParse(int argc, char** argv, double* runTimePtr, PlannerType *plannerPtr
     else if (boost::iequals("Apartment-Reverse", envStr))
     {
         env = "Apartment-Reverse";
+    }
+    else if (boost::iequals("Pipedream", envStr))
+    {
+        env = "Pipedream";
+    }
+    else if (boost::iequals("Spirelli", envStr))
+    {
+        env = "Spirelli";
     }
     else
     {
@@ -916,6 +1021,15 @@ bool argParse(int argc, char** argv, double* runTimePtr, PlannerType *plannerPtr
     {
         optimal = true;
         *plannerPtr = PLANNER_RRTBISPACESTAR;
+    }
+    else if (boost::iequals("RRTBispaceD", plannerStr))
+    {
+        *plannerPtr = PLANNER_RRTBISPACED;
+    }
+    else if (boost::iequals("RRTBispaceDstar", plannerStr))
+    {
+        optimal = true;
+        *plannerPtr = PLANNER_RRTBISPACEDSTAR;
     }
     else if (boost::iequals("CellBispace", plannerStr))
     {

@@ -50,7 +50,7 @@
 #include <ompl/geometric/planners/rrt/RRT.h>
 #include <ompl/geometric/planners/sbl/SBL.h>
 #include <ompl/geometric/planners/bispace/RRTBispace.h>
-//#include <ompl/geometric/planners/ase/BiASE.h>
+#include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
 
@@ -65,7 +65,7 @@
 #include <ompl/geometric/planners/rrt/RRTstar.h>
 #include <ompl/geometric/planners/rrt/SORRTstar.h>
 #include <ompl/geometric/planners/bispace/RRTBispacestar.h>
-//#include <ompl/geometric/planners/ase/BiASEstar.h>
+#include <ompl/geometric/planners/ase/BiASEstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCstar.h>
 //#include <ompl/geometric/planners/hsc/HSCASEstar.h>
 
@@ -237,30 +237,28 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
-        /*
         case PLANNER_BIASE:
         {
             auto planner = std::make_shared<og::BiASE>(si);
-            planner->setLazyNode(true);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
-
+            if (params.hasParam(std::string("pen_distance")))
+                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
             return planner;
             break;
         }
         case PLANNER_BIASESTAR:
         {
             auto planner = std::make_shared<og::BiASEstar>(si);
-            planner->setLazyNode(true);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
-
+            if (params.hasParam(std::string("pen_distance")))
+                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
             return planner;
             break;
         }
-        */
         case PLANNER_BIHSC:
         {
             auto planner = std::make_shared<og::BiHSC>(si);
@@ -286,6 +284,7 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             planner->setDistanceCertificate(svc->getDistanceCertificate());
             planner->setLazyNode(true);
             planner->setUseCollisionCertificateChecker(true);
+//            planner->setAddIntermediateState(false);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
@@ -355,7 +354,8 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
 }
 
 // Parse the command-line arguments
-bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param, std::string &spaceType, unsigned int &run_cycle);
+bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param, std::string &spaceType,
+        std::string &robotType, double &radius, unsigned int &run_cycle);
 
 const base::State* getState(const base::State* state, unsigned int /*index*/)
 {
@@ -368,12 +368,14 @@ int main(int argc, char* argv[])
     bool optimal;
     bool default_param;
     double runTime;
+    double radius;
     PlannerType plannerType;
     std::string env;
     std::string spaceType;
+    std::string robotType;
     unsigned int run_cycle;
     // Parse the arguments, returns true if successful, false otherwise
-    if (!argParse(argc, argv, runTime, plannerType, optimal, env, default_param, spaceType, run_cycle))
+    if (!argParse(argc, argv, runTime, plannerType, optimal, env, default_param, spaceType, robotType, radius, run_cycle))
         return -1;
 
     ob::StateSpacePtr space;
@@ -409,18 +411,26 @@ int main(int argc, char* argv[])
     auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, app::Motion_2D, 0.0001, -0.01, space, getState);
     svc->setEnvironmentFile(std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
 
-    int vcount = 3;
-    Eigen::Vector2d vecs[vcount];
-//    double x[3] = {5.0 * 0.0086579571682871, -5.0 * 0.02506512753291945, 5.0 * 0.012808997914287135};
-//    double y[3] = {5.0 * 0.028723505664735693, 5.0 * 0.01648451945791818, -5.0 * 0.027128021904145316}
-    double x[3] = {0.0086579571682871, -0.02506512753291945, 0.012808997914287135};
-    double y[3] = {0.028723505664735693, 0.01648451945791818, -0.027128021904145316};
-    for (int i = 0; i < vcount; i++)
-        vecs[i] = Eigen::Vector2d(x[i], y[i]);
+    if (robotType == "polygon")
+    {
+        int vcount = 3;
+        Eigen::Vector2d vecs[vcount];
+//        double x[3] = {5.0 * 0.0086579571682871, -5.0 * 0.02506512753291945, 5.0 * 0.012808997914287135};
+//        double y[3] = {5.0 * 0.028723505664735693, 5.0 * 0.01648451945791818, -5.0 * 0.027128021904145316}
+        double x[3] = {0.0086579571682871, -0.02506512753291945, 0.012808997914287135};
+        double y[3] = {0.028723505664735693, 0.01648451945791818, -0.027128021904145316};
+        for (int i = 0; i < vcount; i++)
+            vecs[i] = Eigen::Vector2d(x[i], y[i]);
 
-    auto polygon(std::make_shared<app::geometries::Polygon>());
-    polygon->set(vecs, vcount);
-    svc->addRobotShape(polygon);
+        auto polygon(std::make_shared<app::geometries::Polygon>());
+        polygon->set(vecs, vcount);
+        svc->addRobotShape(polygon);
+    }
+    else if (robotType == "circle")
+    {
+        auto circle(std::make_shared<app::geometries::Circle>(radius));
+        svc->addRobotShape(circle);
+    }
 
     si->setStateValidityChecker(svc);
     si->setStateValidityCheckingResolution(0.01);
@@ -460,7 +470,7 @@ int main(int argc, char* argv[])
     if (optimal)
     {
         auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
-        obj->setCostThreshold(base::Cost(std::sqrt(1.0)));
+        obj->setCostThreshold(base::Cost(1.65));
         setup.setOptimizationObjective(obj);
     }
 
@@ -513,7 +523,8 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param, std::string &spaceType, unsigned int &run_cycle)
+bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param,
+        std::string &spaceType, std::string &robotType, double &radius, unsigned int &run_cycle)
 {
     namespace bpo = boost::program_options;
 
@@ -526,6 +537,8 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
         ("runtime,t", bpo::value<double>()->default_value(1.0), "(Optional) Specify the runtime in seconds. Defaults to 1 and must be greater than 0.")
         ("planner,p", bpo::value<std::string>()->default_value("RRTstar"), "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are BFMTstar, BITstar, CForest, FMTstar, InformedRRTstar, PRMstar, RRTstar, SORRTstar, RRT, RRTConnect, RRTBispace, RRTBispacestar, BiASE, BiASEstar, BiHSC, BiHSCstar, HSCASE, HSCASEstar, SBL, LSCAI, LSCAIstar.")
         ("spacetype,s", bpo::value<std::string>()->default_value("RealVector2"), "(Optional) Specify the planning space type, default to RealVector2 if not given. Valid options are RealVector2, SE2, Dubins, ReedsShepp.")
+        ("robottype", bpo::value<std::string>()->default_value("polygon"), "(Optional) Specify the robot type, default to polygon if not given. Valid options are polygon, circle.")
+        ("radius", bpo::value<double>()->default_value(0.0), "(Optional) Specify the circle robot radius. Defaults to 0 and must be greater than 0.")
         ("run_cycle,r", bpo::value<unsigned int>()->default_value(1), "(Optional) Specify the run cycles.");
     bpo::variables_map vm;
     bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
@@ -668,6 +681,22 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
     {
         spaceType = "ReedsShepp";
     }
+
+    robotType = vm["robottype"].as<std::string>();
+    if (boost::iequals("polygon", robotType))
+    {
+        robotType = "polygon";
+    }
+    else if (boost::iequals("circle", robotType))
+    {
+        robotType = "circle";
+    }
+    else
+    {
+        robotType = "polygon";
+    }
+
+    radius = vm["radius"].as<double>();
 
     return true;
 }

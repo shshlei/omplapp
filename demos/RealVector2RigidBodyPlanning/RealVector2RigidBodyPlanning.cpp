@@ -22,7 +22,7 @@
 #include <ompl/geometric/planners/rrt/RRT.h>
 #include <ompl/geometric/planners/sbl/SBL.h>
 #include <ompl/geometric/planners/bispace/RRTBispace.h>
-//#include <ompl/geometric/planners/ase/BiASE.h>
+#include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
 
@@ -37,7 +37,7 @@
 #include <ompl/geometric/planners/rrt/RRTstar.h>
 #include <ompl/geometric/planners/rrt/SORRTstar.h>
 #include <ompl/geometric/planners/bispace/RRTBispacestar.h>
-//#include <ompl/geometric/planners/ase/BiASEstar.h>
+#include <ompl/geometric/planners/ase/BiASEstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCstar.h>
 //#include <ompl/geometric/planners/hsc/HSCASEstar.h>
 
@@ -206,30 +206,28 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
-        /*
         case PLANNER_BIASE:
         {
             auto planner = std::make_shared<og::BiASE>(si);
-            planner->setLazyNode(true);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
-
+            if (params.hasParam(std::string("pen_distance")))
+                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
             return planner;
             break;
         }
         case PLANNER_BIASESTAR:
         {
             auto planner = std::make_shared<og::BiASEstar>(si);
-            planner->setLazyNode(true);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
-
+            if (params.hasParam(std::string("pen_distance")))
+                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
             return planner;
             break;
         }
-        */
         case PLANNER_BIHSC:
         {
             auto planner = std::make_shared<og::BiHSC>(si);

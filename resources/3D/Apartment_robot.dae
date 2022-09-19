@@ -1302,7 +1302,7 @@
                 <technique sid="COMMON">
                     <lambert>
                         <diffuse>
-                            <color>0.1372549 0.1372549 0.1372549 1.0000000</color>
+                            <color>0.0 1.0 0.0 1.0000000</color>
                         </diffuse>
                     </lambert>
                 </technique>
@@ -1313,7 +1313,7 @@
                 <technique sid="COMMON">
                     <lambert>
                         <diffuse>
-                            <color>1.0000000 1.0000000 1.0000000 1.0000000</color>
+                            <color>0.0 1.0000000 0.0000000 1.0000000</color>
                         </diffuse>
                     </lambert>
                 </technique>
@@ -1324,7 +1324,7 @@
                 <technique sid="COMMON">
                     <lambert>
                         <diffuse>
-                            <color>1.0000000 1.0000000 1.0000000 1.0000000</color>
+                            <color>0.0000000 1.0000000 0.0000000 1.0000000</color>
                         </diffuse>
                     </lambert>
                 </technique>
@@ -1335,7 +1335,7 @@
                 <technique sid="COMMON">
                     <lambert>
                         <diffuse>
-                            <color>1.0000000 1.0000000 1.0000000 1.0000000</color>
+                            <color>0.0000000 1.0000000 0.0000000 1.0000000</color>
                         </diffuse>
                     </lambert>
                 </technique>
@@ -1346,7 +1346,7 @@
                 <technique sid="COMMON">
                     <lambert>
                         <diffuse>
-                            <color>0.7215686 0.5254902 0.0431373 1.0000000</color>
+                            <color>0.0 1.0 0.0 1.0000000</color>
                         </diffuse>
                     </lambert>
                 </technique>
@@ -1357,7 +1357,7 @@
                 <technique sid="COMMON">
                     <constant>
                         <transparent opaque="A_ONE">
-                            <color>0.0000000 0.0000000 0.0000000 1.0000000</color>
+                            <color>0.0000000 1.0000000 0.0000000 1.0000000</color>
                         </transparent>
                         <transparency>
                             <float>1.0000000</float>

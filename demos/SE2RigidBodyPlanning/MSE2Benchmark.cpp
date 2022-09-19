@@ -15,7 +15,7 @@
 #include <ompl/geometric/planners/stride/STRIDE.h>
 #include <ompl/geometric/planners/bispace/CellBispace.h>
 #include <ompl/geometric/planners/bispace/RRTBispace.h>
-//#include <ompl/geometric/planners/ase/BiASE.h>
+#include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
 
@@ -33,7 +33,7 @@
 #include <ompl/geometric/planners/sst/SST.h>
 #include <ompl/geometric/planners/bispace/CellBispacestar.h>
 #include <ompl/geometric/planners/bispace/RRTBispacestar.h>
-//#include <ompl/geometric/planners/ase/BiASEstar.h>
+#include <ompl/geometric/planners/ase/BiASEstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCstar.h>
 //#include <ompl/geometric/planners/hsc/HSCASEstar.h>
 
@@ -93,7 +93,7 @@ void benchmarkMaze(bool optimal, std::string &benchmark_name, app::SE2RigidBodyP
     memory_limit = 10000.0;
     run_count = 20;
     if (optimal)
-        runtime_limit = 500.0;
+        runtime_limit = 20.0;
 }
 
 void benchmarkBarriers(bool optimal, std::string &benchmark_name, app::SE2RigidBodyPlanning &setup, double &runtime_limit,
@@ -136,6 +136,86 @@ void benchmarkBarriers(bool optimal, std::string &benchmark_name, app::SE2RigidB
         runtime_limit = 100.0;
 }
 
+void benchmarkRandomPolygons(bool optimal, std::string &benchmark_name, app::SE2RigidBodyPlanning &setup, double &runtime_limit,
+                double &memory_limit, int &run_count)
+{
+    if (optimal)
+        benchmark_name = std::string("OptimalRandomPolygons");
+    else 
+        benchmark_name = std::string("FeasibleRandomPolygons");
+    std::string robot_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/2D/car2_planar_robot.dae";
+    std::string env_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/2D/RandomPolygons_planar_env.dae";
+    setup.setRobotMesh(robot_fname);
+    setup.setEnvironmentMesh(env_fname);
+
+    base::ScopedState<base::SE2StateSpace> start(setup.getSpaceInformation());
+    start->setX(-32.99);
+    start->setY(42.85);
+    start->setYaw(0.0);
+
+    // define goal state
+    base::ScopedState<base::SE2StateSpace> goal(start);
+    goal->setX(14.01);
+    goal->setY(-43.15);
+    goal->setYaw(0.802851455917);
+
+    setup.setStartAndGoalStates(start, goal);
+    setup.getSpaceInformation()->setStateValidityCheckingResolution(0.01);
+    if (optimal)
+    {
+        auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
+        obj->setCostThreshold(base::Cost(1000.0));
+        setup.setOptimizationObjective(obj);
+    }
+    setup.setup();
+
+    runtime_limit = 20.0;
+    memory_limit = 10000.0;
+    run_count = 20;
+    if (optimal)
+        runtime_limit = 100.0;
+}
+
+void benchmarkBugTrap(bool optimal, std::string &benchmark_name, app::SE2RigidBodyPlanning &setup, double &runtime_limit,
+                double &memory_limit, int &run_count)
+{
+    if (optimal)
+        benchmark_name = std::string("OptimalBugTrap");
+    else 
+        benchmark_name = std::string("FeasibleBugTrap");
+    std::string robot_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/2D/car1_planar_robot.dae";
+    std::string env_fname = std::string(OMPLAPP_RESOURCE_DIR) + "/2D/BugTrap_planar_env.dae";
+    setup.setRobotMesh(robot_fname);
+    setup.setEnvironmentMesh(env_fname);
+
+    base::ScopedState<base::SE2StateSpace> start(setup.getSpaceInformation());
+    start->setX(6.0);
+    start->setY(12.0);
+    start->setYaw(0.0);
+
+    // define goal state
+    base::ScopedState<base::SE2StateSpace> goal(start);
+    goal->setX(-39.0);
+    goal->setY(0.0);
+    goal->setYaw(0.0);
+
+    setup.setStartAndGoalStates(start, goal);
+    setup.getSpaceInformation()->setStateValidityCheckingResolution(0.01);
+    if (optimal)
+    {
+        auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
+        obj->setCostThreshold(base::Cost(135.0));
+        setup.setOptimizationObjective(obj);
+    }
+    setup.setup();
+
+    runtime_limit = 50.0;
+    memory_limit = 10000.0;
+    run_count = 20;
+    if (optimal)
+        runtime_limit = 200.0;
+}
+
 bool argParse(int argc, char** argv, std::string &env, bool &optimal);
 
 int main(int argc, char* argv[])
@@ -159,6 +239,10 @@ int main(int argc, char* argv[])
         benchmarkMaze(optimal, benchmark_name, setup, runtime_limit, memory_limit, run_count);
     else if (env == "Barriers")
         benchmarkBarriers(optimal, benchmark_name, setup, runtime_limit, memory_limit, run_count);
+    else if (env == "RandomPolygons")
+        benchmarkRandomPolygons(optimal, benchmark_name, setup, runtime_limit, memory_limit, run_count);
+    else if (env == "BugTrap")
+        benchmarkBugTrap(optimal, benchmark_name, setup, runtime_limit, memory_limit, run_count);
 
     auto si = setup.getSpaceInformation();
     auto svc = std::make_shared<app::ContactStateValidityChecker>(si, setup.getMotionModel(), 0.05, -0.05,
@@ -178,18 +262,6 @@ int main(int argc, char* argv[])
         addPlanner(b, std::make_shared<ompl::geometric::BITstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LBTRRT>(si));
         */
-
-        {
-            auto planner = std::make_shared<ompl::geometric::FMT>(si);
-            planner->setNumSamples(1550);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::BFMT>(si);
-            planner->setNumSamples(1550);
-            addPlanner(b, planner);
-        }
 
         /*
         {
@@ -222,18 +294,10 @@ int main(int argc, char* argv[])
         }
         */
 
-        /*
         {
             auto planner = std::make_shared<ompl::geometric::BiASEstar>(si);
             addPlanner(b, planner);
         }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::BiASEstar>(si);
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
-        */
 
         /*
         {
@@ -283,6 +347,8 @@ int main(int argc, char* argv[])
     }
     else 
     {
+        addPlanner(b, std::make_shared<ompl::geometric::PRM>(si));
+
         /*
         addPlanner(b, std::make_shared<ompl::geometric::SBL>(si));
         addPlanner(b, std::make_shared<ompl::geometric::EST>(si));
@@ -324,14 +390,9 @@ int main(int argc, char* argv[])
             auto planner = std::make_shared<ompl::geometric::BiASE>(si);
             addPlanner(b, planner);
         }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::BiASE>(si);
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
         */
 
+        /*
         {
             auto planner = std::make_shared<ompl::geometric::BiHSC>(si);
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
@@ -341,7 +402,6 @@ int main(int argc, char* argv[])
             addPlanner(b, planner);
         }
 
-        /*
         {
             auto planner = std::make_shared<ompl::geometric::BiHSC>(si);
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
@@ -380,7 +440,10 @@ int main(int argc, char* argv[])
     }
 
     b.benchmark(request);
-    b.saveResultsToFile((benchmark_name + "FMT" + ".log").c_str());
+    if (optimal)
+        b.saveResultsToFile((benchmark_name + "biasestar" + ".log").c_str());
+    else
+        b.saveResultsToFile((benchmark_name + "biase" + ".log").c_str());
 
     return 0;
 }
@@ -395,7 +458,7 @@ bool argParse(int argc, char** argv, std::string &env, bool &optimal)
     desc.add_options()
         ("help,h", "produce help message")
         ("optimal,o", bpo::value<bool>()->default_value(false), "(Optional) Specify if it is an optimal benchmark.")
-        ("env,e", bpo::value<std::string>()->default_value("Maze"), "(Optional) Specify the Benchmark environment, defaults to Maze if not given. Valid options are Maze, Barriers.");
+        ("env,e", bpo::value<std::string>()->default_value("Maze"), "(Optional) Specify the Benchmark environment, defaults to Maze if not given. Valid options are Maze, Barriers, RandomPolygons, BugTrap.");
     bpo::variables_map vm;
     bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
     bpo::notify(vm);
@@ -418,6 +481,14 @@ bool argParse(int argc, char** argv, std::string &env, bool &optimal)
     else if (boost::iequals("Barriers", envStr))
     {
         env = "Barriers";
+    }
+    else if (boost::iequals("RandomPolygons", envStr))
+    {
+        env = "RandomPolygons";
+    }
+    else if (boost::iequals("BugTrap", envStr))
+    {
+        env = "BugTrap";
     }
     else
     {
