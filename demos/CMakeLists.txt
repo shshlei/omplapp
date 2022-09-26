@@ -23,18 +23,40 @@ if (OMPL_BUILD_DEMOS)
 #    add_omplapp_demo(demo_CollisionCheckers SE3RigidBodyPlanning/CollisionCheckers.cpp)
 #    add_omplapp_demo(demo_AnytimePathShortening AnytimePathShorteningDemo.cpp)
 
-    add_omplapp_demo(demo_create_geometries create_geometries_example.cpp)
-    add_omplapp_demo(demo_parse_mesh parse_mesh_example.cpp)
-    add_omplapp_demo(demo_box_box box_box.cpp)
-    add_omplapp_demo(demo_Exam Exam.cpp)
-    add_omplapp_demo(demo_RandomScenario RandomScenario.cpp)
-    add_omplapp_demo(demo_ReadRandomScenario ReadRandomScenario.cpp)
+    add_omplapp_demo(demo_create_geometries BulletTest/create_geometries_example.cpp)
+    add_omplapp_demo(demo_parse_mesh BulletTest/parse_mesh_example.cpp)
+    add_omplapp_demo(demo_box_box BulletTest/box_box.cpp)
+    add_omplapp_demo(demo_RandomScenarioCreation RandomPolygonCircles/RandomScenarioCreation.cpp)
+    add_omplapp_demo(demo_RandomScenarioRead RandomPolygonCircles/RandomScenarioRead.cpp)
 
-    add_omplapp_demo(demo_TestBinaryHeap TestBinaryHeap.cpp)
-    add_omplapp_demo(demo_TestGrid TestGrid.cpp)
-    add_omplapp_demo(demo_TestDiscretization TestDiscretization.cpp)
-    add_omplapp_demo(demo_TestVectorErase TestVectorErase.cpp)
-    add_omplapp_demo(demo_TestGraphRemoveNodeVSClearAdd TestGraphRemoveNodeVSClearAdd.cpp)
+    add_omplapp_demo(demo_Exam MessTest/Exam.cpp)
+    add_omplapp_demo(demo_TestBinaryHeap MessTest/TestBinaryHeap.cpp)
+    add_omplapp_demo(demo_TestGrid MessTest/TestGrid.cpp)
+    add_omplapp_demo(demo_TestDiscretization MessTest/TestDiscretization.cpp)
+    add_omplapp_demo(demo_TestVectorErase MessTest/TestVectorErase.cpp)
+    add_omplapp_demo(demo_TestGraphRemoveNodeVSClearAdd MessTest/TestGraphRemoveNodeVSClearAdd.cpp)
+
+    add_omplapp_demo(demo_SimpleConfigurationCertificate
+        SimpleConfigurationCertificate/SimpleConfigurationCertificate.cpp
+        SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.h
+        SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.cpp
+        SimpleConfigurationCertificate/CSCRRT.h
+        SimpleConfigurationCertificate/CSCRRT.cpp
+        SimpleConfigurationCertificate/CSCRRTstar.h
+        SimpleConfigurationCertificate/CSCRRTstar.cpp
+        SimpleConfigurationCertificate/CSCRRTConnect.h
+        SimpleConfigurationCertificate/CSCRRTConnect.cpp)
+
+    add_omplapp_demo(demo_SimpleConfigurationBenchmark
+        SimpleConfigurationCertificate/SimpleConfigurationBenchmark.cpp
+        SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.h
+        SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.cpp
+        SimpleConfigurationCertificate/CSCRRT.h
+        SimpleConfigurationCertificate/CSCRRT.cpp
+        SimpleConfigurationCertificate/CSCRRTstar.h
+        SimpleConfigurationCertificate/CSCRRTstar.cpp
+        SimpleConfigurationCertificate/CSCRRTConnect.h
+        SimpleConfigurationCertificate/CSCRRTConnect.cpp)
 
     add_omplapp_demo(demo_RandomPolygonCircles RandomPolygonCircles/RandomPolygonCirclesPlanning.cpp)
     add_omplapp_demo(demo_RandomPolygonCirclesBenchmark RandomPolygonCircles/RandomPolygonCirclesBenchmark.cpp)
@@ -42,7 +64,6 @@ if (OMPL_BUILD_DEMOS)
 
     add_omplapp_demo(demo_MaxDistance SE2MaxDistance.cpp)
     add_omplapp_demo(demo_Box2dSafetyCertificateChecker Box2dSafetyCertificateChecker.cpp)  
-    add_omplapp_demo(demo_Box2dSafetyCertificateChecker2 Box2dSafetyCertificateChecker2.cpp)
     add_omplapp_demo(demo_MSE2RigidBodyPlanning SE2RigidBodyPlanning/MSE2RigidBodyPlanning.cpp)
     add_omplapp_demo(demo_MSE2MultiRigidBodyPlanning SE2RigidBodyPlanning/MSE2MultiRigidBodyPlanning.cpp)
     add_omplapp_demo(demo_MSE2Benchmark SE2RigidBodyPlanning/MSE2Benchmark.cpp)

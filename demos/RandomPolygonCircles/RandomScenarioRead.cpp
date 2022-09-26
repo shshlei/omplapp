@@ -34,6 +34,7 @@
 
 /* Author: Shi Shenglei */
 
+#include <omplapp/config.h>
 #include <box2d_collision/b2_bvh_manager.h>
 #include <ompl/util/Time.h>
 #include <ompl/util/Console.h>
@@ -42,51 +43,10 @@
 #include <fstream>
 #include <string>
 #include <boost/math/constants/constants.hpp>
+#include <boost/program_options.hpp>
+#include <boost/algorithm/string.hpp>
 
 using namespace ompl;
-
-class MQueryCallback : public b2QueryCallback
-{
-public:
-    MQueryCallback(const b2Shape * shape) : b2QueryCallback()
-    {
-        shape_ = shape;
-        xf_.SetIdentity();
-        collision_ = false;
-    }
-
-    ~MQueryCallback() override = default;
-
-    /// Called for each fixture found in the query AABB.
-    /// @return false to terminate the query.
-    bool ReportFixture(b2Fixture* fixture, int32 childIndex) override
-    {
-        b2Transform xf;
-        xf.SetIdentity();
-        if (b2TestOverlap(shape_, 0, fixture->GetShape(), childIndex, xf_, xf))
-        {
-            collision_ = true;
-            return false;
-        }
-        return true;
-    }
-
-    void setTransform(const b2Transform &xf)
-    {
-        xf_ = xf;
-        collision_ = false;
-    }
-
-    bool getCollisionStatus() const 
-    {
-        return collision_;
-    }
-
-private:
-    const b2Shape *shape_;
-    b2Transform xf_;
-    bool collision_;
-};
 
 bool readHeader(std::istream& s, int& numbers)
 {
@@ -215,10 +175,23 @@ bool read(b2BVHManager &manager, const std::string& filename)
     return read(manager, file);
 }
 
-int main()
+bool argParse(int argc, char** argv, std::string &env, bool &collision_status, bool &contact_test, bool &collision_points, bool &safe_points, bool &compare);
+
+int main(int argc, char* argv[])
 {
+    std::string env;
+    bool collision_status = false;
+    bool contact_test = false;
+    bool collision_points = false;
+    bool safe_points = false;
+    bool compare = false;
+
+    // Parse the arguments, returns true if successful, false otherwise
+    if (!argParse(argc, argv, env, collision_status, contact_test, collision_points, safe_points, compare))
+        return -1;
+
     b2BVHManager manager;
-    read(manager, "../../resources/random_scenarios.ply");
+    read(manager, std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
 
     int count = 3;
     b2Vec2 vecs[count];
@@ -231,8 +204,7 @@ int main()
     pshape->Set(vecs, count);
     manager.AddBody("robot", pshape, true);
 
-//    MQueryCallback callback(pshape);
-    if (false)
+    if (collision_status)
     {
         std::ofstream ofs("collision_status.txt", std::ios::binary | std::ios::out);
         for (int i = 0; i < 1001; i++)
@@ -242,11 +214,6 @@ int main()
             {
                 double xx = 0.001 * j;
                 b2Transform xf(b2Vec2(b2Scalar(xx), b2Scalar(yy)), b2Scalar(0.0));
-//                callback.setTransform(xf);
-//                b2AABB aabb;
-//                pshape->ComputeAABB(&aabb, xf, 0);
-//                manager.QueryAABB(&callback, aabb);
-//                bool collision = callback.getCollisionStatus();
                 manager.SetBodyTransform("robot", xf);
                 bool collision = manager.ContactTest();
                 ofs << collision << " ";
@@ -256,7 +223,7 @@ int main()
         ofs.close();
     }
 
-    if (false)
+    if (contact_test)
     {
         ompl::RNG rng;
         std::ofstream ofs("contact_test.txt", std::ios::binary | std::ios::out);
@@ -265,32 +232,18 @@ int main()
         {
             double xc = rng.uniform01();
             double yc = rng.uniform01();
+
             b2Transform xf(b2Vec2(b2Scalar(xc), b2Scalar(yc)), b2Scalar(0.0));
-            //        callback.setTransform(xf);
-            //        b2AABB aabb;
-            //        pshape->ComputeAABB(&aabb, xf, 0);;
-            //        manager.QueryAABB(&callback, aabb);
-            //        bool collision = callback.getCollisionStatus();
-            //        std::cout << xc << "  " << yc << "  " << collision << std::endl;
             manager.SetBodyTransform("robot", xf);
-            b2WorldManifold manifold;
-//            b2ContactResult contacts;
+            b2ContactResult contacts;
             b2InscribedSpheres inscribedSpheres;
-            if (manager.ContactTest(&manifold, &inscribedSpheres))
+            if (manager.ContactTest(&contacts, &inscribedSpheres))
             {
                 ofs << xc << " " << yc << " ";
-                for (int i = 0; i < manifold.pointCount; i++)
-                {
-                    b2Vec2 p1 = manifold.points[i];
-                    b2Vec2 p2 = manifold.points[i] + manifold.separations[i] * manifold.normal;
-                    ofs << p1.x << " " << p1.y << " " << p2.x << " " << p2.y << " ";
-                }
-                ofs << std::endl;
-                /*
                 b2Vec2 p1 = contacts.points[0];
                 b2Vec2 p2 = contacts.points[1];
-                ofs << p1.x << " " << p1.y << " " << p2.x << " " << p2.y << std::endl;
-                */
+                ofs << p1.x << " " << p1.y << " " << p2.x << " " << p2.y << " ";
+                ofs << std::endl;
                 if (inscribedSpheres.has_sphere1)
                     ofss << inscribedSpheres.center1.x << " " << inscribedSpheres.center1.y << " " << inscribedSpheres.radius1 << " ";
                 if (inscribedSpheres.has_sphere2)
@@ -302,7 +255,7 @@ int main()
         ofss.close();
     }
 
-    if (false)
+    if (collision_points)
     {
         ompl::RNG rng;
         std::ofstream ofs1("collision_points.txt", std::ios::binary | std::ios::out);
@@ -312,8 +265,8 @@ int main()
         {
             double xc = rng.uniform01();
             double yc = rng.uniform01();
-//            if (xc < 0.0125 || xc > 0.9875 || yc < 0.0125 || yc > 0.9875)
-//                continue;
+            if (xc < 0.05 || xc > 0.95 || yc < 0.05 || yc > 0.95)
+                continue;
             b2Transform xf(b2Vec2(b2Scalar(xc), b2Scalar(yc)), b2Scalar(0.0));
             manager.SetBodyTransform("robot", xf);
             b2ContactResult contacts;
@@ -321,7 +274,7 @@ int main()
             if (collision)
             {
                 bool sc = false;
-                for (std::size_t i = 0; i < xcs.size(); i++)
+                for (std::size_t i = 0; i < xcs.size(); i++) // filter out
                 {
                     double dist = std::sqrt((xc - xcs[i]) * (xc - xcs[i]) + (yc - ycs[i]) * (yc - ycs[i]));
                     if (dist <= radiuss[i])
@@ -341,7 +294,7 @@ int main()
                 double rmin = 0.0, rmax = 1.0, rmiddle = 0.5;
                 while (true)
                 { // x+
-                    while (rmax - rmin > 1.e-8)
+                    while (rmax - rmin > 1.e-2) // minimum translation
                     {
                         rmiddle = (rmin + rmax) / 2.0;
                         xf.Set(b2Vec2(b2Scalar(xc + rmiddle), b2Scalar(yc)), b2Scalar(0.0));
@@ -356,7 +309,7 @@ int main()
                     xf.Set(b2Vec2(b2Scalar(xc + rmax), b2Scalar(yc)), b2Scalar(0.0));
                     manager.SetBodyTransform("robot", xf);
                     b2ContactResult contact;
-                    if (manager.ContactTest(&contact))
+                    if (manager.ContactTest(&contact)) // another contact
                     {
                         manager.DisableAll();
                         manager.EnableBody(contact.names[0]);
@@ -377,7 +330,7 @@ int main()
                 rmin = 0.0, rmax = 1.0, rmiddle = 0.5;
                 while (true)
                 { // x-
-                    while (rmax - rmin > 1.e-8)
+                    while (rmax - rmin > 1.e-2) // minimum translation
                     {
                         rmiddle = (rmin + rmax) / 2.0;
                         xf.Set(b2Vec2(b2Scalar(xc - rmiddle), b2Scalar(yc)), b2Scalar(0.0));
@@ -392,7 +345,7 @@ int main()
                     xf.Set(b2Vec2(b2Scalar(xc - rmax), b2Scalar(yc)), b2Scalar(0.0));
                     manager.SetBodyTransform("robot", xf);
                     b2ContactResult contact;
-                    if (manager.ContactTest(&contact))
+                    if (manager.ContactTest(&contact)) // another contact
                     {
                         manager.DisableAll();
                         manager.EnableBody(contact.names[0]);
@@ -413,7 +366,7 @@ int main()
                 rmin = 0.0, rmax = 1.0, rmiddle = 0.5;
                 while (true)
                 { // y+
-                    while (rmax - rmin > 1.e-8)
+                    while (rmax - rmin > 1.e-2) // minimum translation
                     {
                         rmiddle = (rmin + rmax) / 2.0;
                         xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc + rmiddle)), b2Scalar(0.0));
@@ -428,7 +381,7 @@ int main()
                     xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc + rmax)), b2Scalar(0.0));
                     manager.SetBodyTransform("robot", xf);
                     b2ContactResult contact;
-                    if (manager.ContactTest(&contact))
+                    if (manager.ContactTest(&contact)) // another contact
                     {
                         manager.DisableAll();
                         manager.EnableBody(contact.names[0]);
@@ -449,7 +402,7 @@ int main()
                 rmin = 0.0, rmax = 1.0, rmiddle = 0.5;
                 while (true)
                 { // y-
-                    while (rmax - rmin > 1.e-8)
+                    while (rmax - rmin > 1.e-2) // minimum translation
                     {
                         rmiddle = (rmin + rmax) / 2.0;
                         xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc - rmiddle)), b2Scalar(0.0));
@@ -464,7 +417,7 @@ int main()
                     xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc - rmax)), b2Scalar(0.0));
                     manager.SetBodyTransform("robot", xf);
                     b2ContactResult contact;
-                    if (manager.ContactTest(&contact))
+                    if (manager.ContactTest(&contact)) // another contact
                     {
                         manager.DisableAll();
                         manager.EnableBody(contact.names[0]);
@@ -494,23 +447,24 @@ int main()
         ofs1.close();
     }
 
-    if (false)
+    if (safe_points)
     {
         ompl::RNG rng;
         std::ofstream ofs2("safe_points.txt", std::ios::binary | std::ios::out);
         int safe_cont = 0;
         std::vector<double> xcs, ycs, radiuss;
-        while (safe_cont < 350)
+        while (safe_cont < 35)
         {
             double xc = rng.uniform01();
             double yc = rng.uniform01();
+
             b2Transform xf(b2Vec2(b2Scalar(xc), b2Scalar(yc)), b2Scalar(0.0));
             manager.SetBodyTransform("robot", xf);
             bool collision = manager.ContactTest();
             if (!collision)
             {
                 bool sc = false;
-                for (std::size_t i = 0; i < xcs.size(); i++)
+                for (std::size_t i = 0; i < xcs.size(); i++) // filter
                 {
                     double dist = std::sqrt((xc - xcs[i]) * (xc - xcs[i]) + (yc - ycs[i]) * (yc - ycs[i]));
                     if (dist <= radiuss[i])
@@ -551,7 +505,7 @@ int main()
         ofs2.close();
     }
 
-    if (false)
+    if (compare)
     {
         int robotC = 15;
         manager.RemoveBody("robot");
@@ -559,7 +513,7 @@ int main()
             manager.AddBody("robot" + std::to_string(i), pshape, true);
 
         b2BVHManager manager2;
-        read(manager2, "../../resources/random_scenarios.ply");
+        read(manager2, std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
 
         b2BVHManager manager3;
         for (int i = 0; i < robotC; i++)
@@ -576,12 +530,7 @@ int main()
                 double xc = rng.uniform01();
                 double yc = rng.uniform01();
                 double yaw= rng.uniformReal(-pi, pi);
-                /*
-                xc = 0.0235317;
-                yc = 0.403731;
-                yaw= 0.435234;
-                std::cout << xc << " " << yc << " " << yaw << std::endl;
-                */
+
                 b2Transform xf;
                 xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc)), b2Scalar(yaw));
 
@@ -620,4 +569,40 @@ int main()
 
     delete pshape;
     return 0;
+}
+
+bool argParse(int argc, char** argv, std::string &env, bool &collision_status, bool &contact_test, bool &collision_points, bool &safe_points, bool &compare)
+{
+    namespace bpo = boost::program_options;
+
+    // Declare the supported options.
+    bpo::options_description desc("Allowed options");
+    desc.add_options()
+        ("help,h", "produce help message")
+        ("env,e", bpo::value<std::string>()->default_value("random_scenarios.ply"), "(Optional) Specify the polygon and circle environment, defaults to random_scenarios.ply if not given.")
+        ("collision_status", bpo::value<bool>()->default_value(false), "Specify collision status. Default to False")
+        ("contact_test", bpo::value<bool>()->default_value(false), "Specify contact test. Default to False")
+        ("collision_points", bpo::value<bool>()->default_value(false), "Specify collision pointst. Default to False")
+        ("safe_points", bpo::value<bool>()->default_value(false), "Specify safe points. Default to False")
+        ("compare", bpo::value<bool>()->default_value(false), "Specify safe points. Default to False");
+    bpo::variables_map vm;
+    bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
+    bpo::notify(vm);
+
+    // Check if the help flag has been given:
+    if (vm.count("help") != 0u)
+    {
+        std::cout << desc << std::endl;
+        return false;
+    }
+
+    env = vm["env"].as<std::string>();
+
+    collision_status = vm["collision_status"].as<bool>();
+    contact_test = vm["contact_test"].as<bool>();
+    collision_points = vm["collision_points"].as<bool>();
+    safe_points = vm["safe_points"].as<bool>();
+    compare = vm["compare"].as<bool>();
+
+    return true;
 }

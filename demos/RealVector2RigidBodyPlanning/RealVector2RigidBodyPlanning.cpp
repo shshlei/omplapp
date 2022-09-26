@@ -381,7 +381,7 @@ int main(int argc, char* argv[])
         envRandomPolygonsCircles(optimal, default_param, setup, range, pen_distance);
 
     auto si = setup.getSpaceInformation();
-    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, setup.getMotionModel(), 0.0001, -0.01,
+    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, setup.getMotionModel(),
             setup.getGeometricComponentStateSpace(), setup.getGeometricStateExtractor());
     svc->setEnvironmentFile(std::string(OMPLAPP_RESOURCE_DIR) + "/random_scenarios.ply");
     int vcount = 3;

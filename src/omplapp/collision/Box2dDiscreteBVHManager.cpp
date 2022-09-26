@@ -62,7 +62,6 @@ namespace ompl
                         vec[i] = convertEigenToBox2d(vecs[i]);
 
                     shape->Set(&vec[0], count);
-                    shape->SetRadius(b2Scalar(0.0));
                     return shape;
                 }
 
@@ -102,7 +101,6 @@ namespace ompl
                 {
                     broadphase_ = std::make_unique<b2BVHManager>();
                     contact_distance_ = 0.0;
-                    negative_distance_= 0.0;
                 }
 
                 Box2dDiscreteBVHManagerPtr Box2dDiscreteBVHManager::clone() const
@@ -112,7 +110,6 @@ namespace ompl
 
                     manager->setActiveCollisionObjects(active_);
                     manager->setContactDistanceThreshold(contact_distance_);
-                    manager->setNegativeDistanceThreshold(negative_distance_);
                     clone_broadphase->SetContactFilter(broadphase_->GetContactFilter());
 
                     const b2Body* bodylist = broadphase_->GetBodyList();
@@ -213,16 +210,10 @@ namespace ompl
                 void Box2dDiscreteBVHManager::setContactDistanceThreshold(double contact_distance)
                 {
                     contact_distance_ = contact_distance;
+                    broadphase_->setContactDistanceThreshold(contact_distance);
                 }
 
                 double Box2dDiscreteBVHManager::getContactDistanceThreshold() const { return contact_distance_; }
-
-                void Box2dDiscreteBVHManager::setNegativeDistanceThreshold(double negative_distance)
-                {
-                    negative_distance_ = negative_distance;
-                }
-
-                double Box2dDiscreteBVHManager::getNegativeDistanceThreshold() const { return negative_distance_; }
 
                 bool Box2dDiscreteBVHManager::contactTest()
                 {
@@ -306,6 +297,11 @@ namespace ompl
                         return true;
                     }
                     return false;
+                }
+
+                double Box2dDiscreteBVHManager::distanceTest()
+                {
+                    return broadphase_->DistanceTest();
                 }
             }
         }

@@ -25,8 +25,7 @@ namespace ompl
             using DistanceCertificate = std::function<std::vector<double>(const base::State *a, const base::State *b)>;
 
             Box2dStateValidityChecker(const ompl::base::SpaceInformationPtr& si, MotionModel mtype,  
-                                        double collision_safety_margin, double negative_distance, const base::StateSpacePtr &gspace,
-                                        const GeometricStateExtractor &se);
+                                      const base::StateSpacePtr &gspace, const GeometricStateExtractor &se);
 
             bool setEnvironmentFile(const std::string &env);
 //            void setPointRobotNumber(int num);
@@ -61,27 +60,6 @@ namespace ompl
             DistanceCertificate getDistanceCertificate() const 
             {
                 return distanceCertificate_;
-            }
-
-            void setCollisionSafetyMargin(double cs)
-            {
-                collision_safety_margin_ = cs;
-                collision_manager_->setContactDistanceThreshold(cs);
-            }
-
-            double getCollisionSafetyMargin() const 
-            {
-                return collision_safety_margin_;
-            }
-
-            void setNegativeDistance(double nd)
-            {
-                collision_manager_->setNegativeDistanceThreshold(nd);
-            }
-
-            double getNegativeDistance() const 
-            {
-                return negative_distance_;
             }
 
             std::vector<std::string> getActiveLinks() const 
@@ -131,9 +109,6 @@ namespace ompl
             mutable std::mutex mutex_;
             /** @brief The discrete contact manager cache */
             mutable std::map<unsigned long int, collision::collision_box2d::Box2dDiscreteBVHManagerPtr> collision_managers_;
-
-            double collision_safety_margin_{0.0001};
-            double negative_distance_{-0.05};
 
             SafetyCertificateChecker safetyCertificateChecker_ = std::bind(&Box2dStateValidityChecker::safetyCertificate, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 

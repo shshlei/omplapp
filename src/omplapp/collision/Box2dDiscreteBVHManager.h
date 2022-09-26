@@ -233,10 +233,6 @@ namespace ompl
                     */
                     virtual double getContactDistanceThreshold() const;
 
-                    virtual void setNegativeDistanceThreshold(double negative_distance);
-
-                    virtual double getNegativeDistanceThreshold() const;
-
                     /**
                     * @brief Perform a contact test for all objects based
                     * @param collisions The Contact results data
@@ -244,6 +240,9 @@ namespace ompl
                     virtual bool contactTest();
                     virtual bool pointTest(const Eigen::Vector2d& point);
                     virtual bool contactTest(base::ContactResult& collisions);
+
+                    virtual double distanceTest();
+                    //virtual double distanceTest(base::ContactResult& collisions);
 
                     std::unique_ptr<b2BVHManager>& getBox2dBroadphse()
                     {
@@ -266,14 +265,13 @@ namespace ompl
 
                         /// Called for each fixture found in the query AABB.
                         /// @return false to terminate the query.
-                        bool ReportFixture(b2Fixture* fixture, int32 /*childIndex*/) override
+                        bool ReportFixture(b2Fixture* fixture) override
                         {
                             if (fixture->GetShape()->TestPoint(xf_, point_))
                             {
                                 collision_ = true;
                                 return false;
                             }
-
                             return true;
                         }
 
@@ -290,7 +288,6 @@ namespace ompl
 
                     std::vector<std::string> active_; 
                     double contact_distance_;         /**< @brief The contact distance threshold */
-                    double negative_distance_;
                     std::unique_ptr<b2BVHManager> broadphase_; /**< @brief The box2d broadphase interface */
                     CollisionShapes m_shapes;                    /**< @brief The shapes that define the collison object */
                     geometries::VectorIsometry2d m_shape_poses; /**< @brief The shpaes poses information */

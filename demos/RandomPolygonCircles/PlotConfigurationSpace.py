@@ -90,10 +90,6 @@ if __name__ == "__main__":
         help='(Optional) Filename of the contact.')
     parser.add_argument('-contacts', '--contact_spheres', default=None, \
         help='(Optional) Filename of the contact spheres.')
-    parser.add_argument('-sc', '--safety_certificate', default=None, \
-        help='(Optional) Filename of the safety certificate spheres.')
-    parser.add_argument('-cc', '--collision_certificate', default=None, \
-        help='(Optional) Filename of the collision certificate spheres.')
     parser.add_argument('-cp', '--collision_points', default=None, \
         help='(Optional) Filename of the collision points.')
     parser.add_argument('-sp', '--safe_points', default=None, \
@@ -191,7 +187,9 @@ if __name__ == "__main__":
             xy = xy[2:]
             x  = xy[::2]
             y  = xy[1::2]
-            ax.scatter(x, y)
+            #ax.scatter(x, y)
+            ax.scatter(x[0], y[0], c='blue')
+            ax.scatter(x[1], y[1], c='red')
     if args.contact_spheres:
         patches_circle = []
         for line in open(args.contact_spheres, 'r').readlines():
@@ -342,5 +340,5 @@ if __name__ == "__main__":
     setup(ax)
     plt.tight_layout()
     #plt.savefig('random_scenarios.eps')
-    plt.savefig('random_scenarios.pdf')
+    #plt.savefig('random_scenarios.pdf')
     plt.show()

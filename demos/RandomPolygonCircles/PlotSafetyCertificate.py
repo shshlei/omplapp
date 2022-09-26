@@ -351,6 +351,7 @@ if __name__ == "__main__":
         yc = 0.403731
         c  = cos(0.435234)
         s  = sin(0.435234)
+
         ttx = [c * x - s * y + xc for x, y in zip(tx, ty)]
         tty = [s * x + c * y + yc for x, y in zip(tx, ty)]
         ax.fill(ttx, tty, 'green', edgecolor='#084F17', linewidth=0.5, linestyle='--', alpha=1.0)
@@ -365,18 +366,62 @@ if __name__ == "__main__":
             circle = Circle((xc, yc), r, color = 'yellow')
             ax.add_patch(circle)
 
+    if False:
+        xc = 0.884618
+        yc = 0.306059
+        c  = cos(2.84177)
+        s  = sin(2.84177)
+
+        ttx = [c * x - s * y + xc for x, y in zip(tx, ty)]
+        tty = [s * x + c * y + yc for x, y in zip(tx, ty)]
+        ax.fill(ttx, tty, 'green', edgecolor='#084F17', linewidth=0.5, linestyle='--', alpha=1.0)
+        ax.scatter(xc, yc, s=2.5, c='#B30059')
+
+        if True:
+            circle = Circle((0.85954895981995882, 0.36664328348987019), 0.013278317471065105, facecolor = 'blue', alpha=1.0, linestyle='--', linewidth=0.1, edgecolor='blue')
+            ax.add_patch(circle)
+            ax.scatter(0.86523745005231234, 0.37013211734781171, c='red')
+
+            if True:
+                xc = 0.87307867789838545
+                yc = 0.30108526681786907
+                c  = -0.92489950549028999
+                s  = 0.38021165782208349
+
+                ttx = [c * x - s * y + xc for x, y in zip(tx, ty)]
+                tty = [s * x + c * y + yc for x, y in zip(tx, ty)]
+                ax.fill(ttx, tty, 'green', edgecolor='#084F17', linewidth=0.5, linestyle='--', alpha=1.0)
+                ax.scatter(xc, yc, s=2.5, c='#B30059')
+
+                ax.scatter(0.85954895981995882, 0.36664328348987019, s=2.5, c='red')
+                ax.scatter(0.83480500000000002, 0.35830400000000001, s=2.5, c='blue')
+
+    if True:
+        xc = 0.87307867789838545
+        yc = 0.30108526681786907
+        c  = -0.92489950549028999
+        s  = 0.38021165782208349
+
+        ttx = [c * x - s * y + xc for x, y in zip(tx, ty)]
+        tty = [s * x + c * y + yc for x, y in zip(tx, ty)]
+        ax.fill(ttx, tty, 'green', edgecolor='#084F17', linewidth=0.5, linestyle='--', alpha=1.0)
+        ax.scatter(xc, yc, s=2.5, c='#B30059')
+
+        ax.scatter(0.85954895981995882, 0.36664328348987019, s=2.5, c='red')
+        ax.scatter(0.83480500000000002, 0.35830400000000001, s=2.5, c='blue')
+
     #props = matplotlib.font_manager.FontProperties()
     #props.set_size('small')
     #ax.tick_params(labelsize=5)
     #ax.legend(framealpha = 0, loc = (0.4, 0.65), fontsize=6)
-    #ax.set_xlim(0.0, 1.0)
-    #ax.set_ylim(0.0, 1.0)
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.0)
     ax.set_axis_on()
-    #ax.set_xticks([])
-    #ax.set_yticks([])
+    ax.set_xticks([])
+    ax.set_yticks([])
     ax.set_aspect('equal')
     setup(ax)
     plt.tight_layout()
     #plt.savefig('random_scenarios.eps')
-    plt.savefig('random_scenarios.pdf')
+    #plt.savefig('random_scenarios.pdf')
     plt.show()

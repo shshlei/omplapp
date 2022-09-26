@@ -46,48 +46,43 @@
 
 class MQueryCallback : public b2QueryCallback
 {
-    public:
-        MQueryCallback(const b2Body * body) : b2QueryCallback()
+public:
+    MQueryCallback(const b2Body * body) : b2QueryCallback()
     {
         xf.SetIdentity();
         body_ = body;
     }
 
-        ~MQueryCallback() override = default;
+    ~MQueryCallback() override = default;
 
-        /// Called for each fixture found in the query AABB.
-        /// @return false to terminate the query.
-        bool ReportFixture(b2Fixture* fixture, int32 childIndex) override
+    /// Called for each fixture found in the query AABB.
+    /// @return false to terminate the query.
+    bool ReportFixture(b2Fixture* fixture) override
+    {
+        if (fixture->GetBody() != body_)
         {
-            if (fixture->GetBody() != body_)
+            const b2Fixture* flist = body_->GetFixtureList();
+            if (b2TestOverlap(flist->GetShape(), fixture->GetShape(), xf, xf))
             {
-                const b2Fixture* flist = body_->GetFixtureList();
-                int32 count = flist->GetProxyCount();
-                for (int32 i = 0; i < count; i++)
-                {
-                    if (b2TestOverlap(flist->GetShape(), i, fixture->GetShape(), childIndex, xf, xf))
-                    {
-                        collisionBodies_.insert(fixture->GetBody()->GetName());
-                        return true;
-                    }
-                }
+                collisionBodies_.insert(fixture->GetBody()->GetName());
+                return true;
             }
-
-            return true;
         }
+        return true;
+    }
 
-        std::set<std::string> getCollisionBodies() const 
-        {
-            return collisionBodies_;
-        }
+    std::set<std::string> getCollisionBodies() const 
+    {
+        return collisionBodies_;
+    }
 
-    private:
-        b2Transform xf;
-        const b2Body* body_;
-        std::set<std::string> collisionBodies_; 
+private:
+    b2Transform xf;
+    const b2Body* body_;
+    std::set<std::string> collisionBodies_; 
 };
 
-bool argParse(int argc, char** argv, double &rmin, double &deltar, int &expect_obstacles, double &circleratio, double &polygonarearatio, bool &disjoint);
+bool argParse(int argc, char** argv, double &rmin, double &deltar, int &expect_obstacles, double &circleratio, double &polygonarearatio, bool &disjoint, bool &decorate);
 
 int main(int argc, char* argv[])
 {
@@ -98,12 +93,11 @@ int main(int argc, char* argv[])
     double polygonarearatio = 0.2;
     int nobstacle = 1000;
     bool disjoint = true;
+    bool decorate = true;
 
     // Parse the arguments, returns true if successful, false otherwise
-    if (!argParse(argc, argv, rmin, deltar, nobstacle, circleratio, polygonarearatio, disjoint))
-    {
+    if (!argParse(argc, argv, rmin, deltar, nobstacle, circleratio, polygonarearatio, disjoint, decorate))
         return -1;
-    }
 
     b2AABB aabb;
     aabb.SetMin(b2Scalar(bmin));
@@ -157,7 +151,7 @@ int main(int argc, char* argv[])
             b2AABB saabb;
             b2Transform xf;
             xf.SetIdentity();
-            shape->ComputeAABB(&saabb, xf, 0);
+            shape->ComputeAABB(&saabb, xf);
             if (aabb.Contains(saabb))
             {
                 i++;
@@ -177,12 +171,8 @@ int main(int argc, char* argv[])
             const b2Fixture *flist = bodylist->GetFixtureList();
             while (flist)
             {
-                int count = flist->GetProxyCount();
-                for (int i = 0; i < count; i++)
-                {
-                    b2AABB faabb = flist->GetAABB(i);
-                    manager.QueryAABB(&callback, faabb);
-                }
+                b2AABB faabb = flist->GetAABB();
+                manager.QueryAABB(&callback, faabb);
                 flist = flist->GetNext();
             }
 
@@ -227,7 +217,7 @@ int main(int argc, char* argv[])
         bodylist = bodylist->GetNext();
     }
 
-    if (true)
+    if (decorate)
     {
         int count = 20;
         double r = 1.0 / (4.0 * count);
@@ -257,7 +247,7 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-bool argParse(int argc, char** argv, double &rmin, double &deltar, int &expect_obstacles, double &circleratio, double &polygonarearatio, bool &disjoint)
+bool argParse(int argc, char** argv, double &rmin, double &deltar, int &expect_obstacles, double &circleratio, double &polygonarearatio, bool &disjoint, bool &decorate)
 {
     namespace bpo = boost::program_options;
 
@@ -270,7 +260,8 @@ bool argParse(int argc, char** argv, double &rmin, double &deltar, int &expect_o
         ("expect_obstacles,o", bpo::value<int>()->default_value(1000), "(Optional) Specify the expected obstacles number. Default to 1000 and must be greater than 1")
         ("circleratio,c", bpo::value<double>()->default_value(0.05), "(Optional) Specify the circle shapes' ratio. Default to 0.05 and must be in range [0.0, 1.0]")
         ("polygonarearatio,p", bpo::value<double>()->default_value(0.2), "(Optional) Specify the polygon area ratio with respect to a circle. Default to 0.2 and must be in range (0.0, 0.5)")
-        ("disjoint,dis", bpo::value<bool>()->default_value(true), "(Optional) Specify if these shapes are disjoint. Default to true");
+        ("disjoint,dis", bpo::value<bool>()->default_value(true), "(Optional) Specify if these shapes are disjoint. Default to true")
+        ("decorate,dec", bpo::value<bool>()->default_value(true), "(Optional) Specify if build circles along the edges. Default to true");
     bpo::variables_map vm;
     bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
     bpo::notify(vm);
@@ -319,6 +310,7 @@ bool argParse(int argc, char** argv, double &rmin, double &deltar, int &expect_o
     }
 
     disjoint = vm["disjoint"].as<bool>();
+    decorate = vm["decorate"].as<bool>();
 
     return true;
 }

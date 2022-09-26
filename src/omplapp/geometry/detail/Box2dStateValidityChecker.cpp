@@ -20,15 +20,11 @@ namespace ompl
     namespace app
     {
         Box2dStateValidityChecker::Box2dStateValidityChecker(const ompl::base::SpaceInformationPtr& si, MotionModel mtype,  
-                                                                double collision_safety_margin, double negative_distance, const base::StateSpacePtr &gspace,
-                                                                const GeometricStateExtractor &se)
-          : StateValidityChecker(si), mtype_(mtype), gspace_(gspace), se_(se),
-            collision_safety_margin_(collision_safety_margin), negative_distance_(negative_distance)
+                                                             const base::StateSpacePtr &gspace, const GeometricStateExtractor &se)
+          : StateValidityChecker(si), mtype_(mtype), gspace_(gspace), se_(se)
         {
             assert(mtype == Motion_2D);
             collision_manager_ = std::make_shared<collision_box2d::Box2dDiscreteBVHManager>();
-            collision_manager_->setContactDistanceThreshold(collision_safety_margin);
-            collision_manager_->setNegativeDistanceThreshold(negative_distance);
         }
 
         bool Box2dStateValidityChecker::setEnvironmentFile(const std::string &env)
@@ -36,14 +32,6 @@ namespace ompl
             assert(collision_manager_->getBox2dBroadphse()->GetBodyCount() == 0);
             return read(env);
         }
-
-//        void Box2dStateValidityChecker::setPointRobotNumber(int num)
-//        {
-//            assert(robotCount_ == 0);
-//            robotCount_ = num;
-//            names_.clear();
-//            names_ = std::vector<std::string>(num, "");
-//        }
 
         bool Box2dStateValidityChecker::addRobotShape(const collision::CollisionShapePtr& shape)
         {
@@ -78,12 +66,6 @@ namespace ompl
             for (unsigned int i = 0; i < names_.size(); i++)
             {
                 Eigen::Isometry2d tf = calculateCurrentTransform(state, i); 
-//                if (names_[i].empty())
-//                {
-//                    if (cm->pointTest(tf.translation()))
-//                        return false;
-//                }
-//                else 
                 cm->setCollisionObjectsTransform(names_[i], tf);
             }
             return !cm->contactTest();
@@ -92,12 +74,12 @@ namespace ompl
         bool Box2dStateValidityChecker::isValid(const ompl::base::State *state, double &dist) const
         {
             dist = clearance(state);
-            return dist >= collision_safety_margin_;
+            return dist > 0.0;
         }
 
         bool Box2dStateValidityChecker::isValid(const ompl::base::State *state, ompl::base::ContactResultVector &contact_vector, double &dist) const
         {
-            dist = collision_safety_margin_;
+            dist = std::numeric_limits<double>::max();
             clearance(state, contact_vector);
             if (!contact_vector.empty())
             {
@@ -105,12 +87,12 @@ namespace ompl
                     if (res.distance < dist)
                         dist = res.distance;
             }
-            return dist >= collision_safety_margin_;
+            return dist > 0.0;
         }
 
         double Box2dStateValidityChecker::clearance(const ompl::base::State *state) const
         {
-            double dist = collision_safety_margin_;
+            double dist = std::numeric_limits<double>::max();
             ompl::base::ContactResultVector contact_vector;
             clearance(state, contact_vector);
             if (!contact_vector.empty())
@@ -456,7 +438,6 @@ namespace ompl
                         vecs[i].Set(b2Scalar(x), b2Scalar(y));
                     }
                     b2PolygonShape *pshape = new b2PolygonShape();
-                    pshape->SetRadius(b2Scalar(0.0));
                     pshape->Set(vecs, count);
                     shape = pshape;
                     shapec++;

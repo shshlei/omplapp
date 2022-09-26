@@ -86,8 +86,17 @@ if __name__ == "__main__":
         help='Filename of random scenario')
     parser.add_argument('-path', '--plannerpath', default=None, \
         help='(Optional) Filename of the planner path.')
+    parser.add_argument('-pd', '--plannerdata', default=None, \
+        help='(Optional) Filename of the planner data.')
     parser.add_argument('-paths', nargs='*')
     args = parser.parse_args()
+
+    invert_yaxis = False
+    if args.plannerdata:
+        import graph_tool.all as gt
+        from ompl import base as ob
+        plt.switch_backend("cairo")
+        invert_yaxis = True
 
     plt.style.use(['seaborn-deep', 'seaborn-paper'])
     plt.rcParams.update({'axes.grid': False})
@@ -121,6 +130,8 @@ if __name__ == "__main__":
                 x = params[1]
                 y = params[2]
                 r = params[3]
+                if invert_yaxis:
+                    y = -y
                 circle = Circle((x, y), r, color = 'gray')
                 patches_circle.append(circle)
             elif params[0] == 1: # polygon
@@ -129,6 +140,8 @@ if __name__ == "__main__":
                 vecs = params[2:]
                 x = vecs[::2]
                 y = np.array(vecs[1::2])
+                if invert_yaxis:
+                    y = list(-np.array(vecs[1::2]))
                 polygon = Polygon(np.array([x,y]).transpose(), True, color = 'gray')
                 patches_polygon.append(polygon)
         pcc = PatchCollection(patches_circle, match_original=False)
@@ -147,6 +160,8 @@ if __name__ == "__main__":
         dxy = np.array(xy).transpose()
         x = dxy[0]
         y = dxy[1]
+        if invert_yaxis:
+            y = -dxy[1]
         if len(dxy) == 3:
             theta = dxy[2]
         if False:
@@ -160,7 +175,7 @@ if __name__ == "__main__":
             y = yy[0:1] + yyy[1:-1:15] + yy[-1:]
             theta = tt[0:1] + ttt[1:-1:15] + tt[-1:]
         ax.plot(x, y, color='#B30059', linewidth=1.0)
-        if True:
+        if False:
             patches_polygon = []
             if len(dxy) == 3:
                 for xc, yc, t in zip(x, y, theta):
@@ -180,6 +195,108 @@ if __name__ == "__main__":
             pcp.set_color('green')
             ax.add_collection(pcp)
         ax.scatter(x, y, color='#B30059', s = 2.0)
+    if args.plannerdata:
+        pd = ob.PlannerData(ob.SpaceInformation(ob.RealVectorStateSpace(2)))
+        pds= ob.PlannerDataStorage()
+        pds.load(args.plannerdata, pd)
+        pd.computeEdgeWeights()
+
+        # Extract the graphml representation of the planner data
+        graphml = pd.printGraphML()
+        f = open("graph.graphml", 'w')
+        f.write(graphml)
+        f.close()
+
+        # Load the graphml data using graph-tool
+        graph = gt.load_graph("graph.graphml", fmt="xml")
+        os.remove("graph.graphml")
+
+        edgeweights = graph.edge_properties["weight"]
+        # Write some interesting statistics
+        avgdeg, stddevdeg = gt.vertex_average(graph, "total")
+        avgwt, stddevwt = gt.edge_average(graph, edgeweights)
+
+        print("---- PLANNER DATA STATISTICS ----")
+        print(str(graph.num_vertices()) + " vertices and " + str(graph.num_edges()) + " edges")
+        print("Average vertex degree (in+out) = " + str(avgdeg) + "  St. Dev = " + str(stddevdeg))
+        print("Average edge weight = " + str(avgwt)  + "  St. Dev = " + str(stddevwt))
+
+        _, hist = gt.label_components(graph)
+        print("Strongly connected components: " + str(len(hist)))
+
+        # Make the graph undirected (for weak components, and a simpler drawing)
+        graph.set_directed(False)
+        _, hist = gt.label_components(graph)
+        print("Weakly connected components: " + str(len(hist)))
+
+        # Plotting the graph
+        gt.remove_parallel_edges(graph) # Removing any superfluous edges
+
+        edgeweights = graph.edge_properties["weight"]
+        colorprops = graph.new_vertex_property("string")
+        colorprops2= graph.new_vertex_property("vector<float>")
+        shapeprops = graph.new_vertex_property("string")
+        vertexsize = graph.new_vertex_property("double")
+
+        start = -1
+        goal = -1
+
+        for v in range(graph.num_vertices()):
+            # Color and size vertices by type: start, goal, other
+            if pd.isStartVertex(v):
+                start = v
+                colorprops[graph.vertex(v)] = "cyan"
+                vertexsize[graph.vertex(v)] = 10
+            elif pd.isGoalVertex(v):
+                goal = v
+                colorprops[graph.vertex(v)] = "green"
+                vertexsize[graph.vertex(v)] = 10
+            else:
+                colorprops[graph.vertex(v)] = "yellow"
+                vertexsize[graph.vertex(v)] = 5
+            if pd.getVertex(v).getTag() == 2:
+#                colorprops2[graph.vertex(v)] = [141.0/255.0, 211.0/255.0, 199.0/255.0, 1.0]
+#                colorprops2[graph.vertex(v)] = [255.0/255.0, 237.0/255.0, 111.0/255.0, 1.0]
+#                colorprops2[graph.vertex(v)] = [141.0/255.0, 211.0/255.0, 199.0/255.0, 1.0]
+#                colorprops2[graph.vertex(v)] = [255.0/255.0, 244.0/255.0, 159.0/255.0, 1.0]
+#                colorprops2[graph.vertex(v)] = [213.0/255.0, 164.0/255.0, 179.0/255.0, 1.0]
+                colorprops2[graph.vertex(v)] = [25.0/255.0, 179.0/255.0, 64.0/255.0, 1.0]
+                shapeprops[graph.vertex(v)] = "square"
+            else:
+                colorprops2[graph.vertex(v)] = [183.0/255.0, 63.0/255.0, 68.0/255.0, 1.0]
+                shapeprops[graph.vertex(v)] = "circle"
+
+        # default edge color is black with size 0.5:
+        edgecolor = graph.new_edge_property("string")
+        edgecolor2= graph.new_edge_property("vector<float>")
+        edgesize = graph.new_edge_property("double")
+        for e in graph.edges():
+            edgecolor[e] = "black"
+#            edgecolor2[e]= [158.0/255.0, 217.0/255.0, 207.0/255.0, 1.0]
+            edgecolor2[e]= [110.0/255.0, 115.0/255.0, 116.0/255.0, 1.0]
+            edgesize[e] = 0.5
+
+        # using A* to find shortest path in planner data
+        if False and start != -1 and goal != -1:
+            _, pred = gt.astar_search(graph, graph.vertex(start), edgeweights)
+
+            # Color edges along shortest path red with size 3.0
+            v = graph.vertex(goal)
+            while v != graph.vertex(start):
+                p = graph.vertex(pred[v])
+                for e in p.out_edges():
+                    if e.target() == v:
+                        edgecolor[e] = "red"
+                        edgesize[e] = 2.0
+                v = p
+
+        pos = graph.new_vertex_property("vector<float>")
+        for v in range(graph.num_vertices()):
+            vtx = pd.getVertex(v);
+            st = vtx.getState()
+            pos[graph.vertex(v)] = [st[0], -st[1]]
+
+        gt.graph_draw(graph, pos=pos, vertex_shape=shapeprops, vertex_size=0.0125, vertex_fill_color=colorprops2, vertex_pen_width=0.001, edge_pen_width=0.003, edge_color=edgecolor2, mplfig=ax)
     if args.paths:
         for path in args.paths:
             print(path)
@@ -192,6 +309,8 @@ if __name__ == "__main__":
             dxy = np.array(xy).transpose()
             x = dxy[0]
             y = dxy[1]
+            if invert_yaxis:
+                y = -dxy[1]
             xx = list(x)
             yy = list(y)
             xxx = xx[1:-1]
@@ -205,23 +324,30 @@ if __name__ == "__main__":
         """start and goal polygon"""
         xc = 0.05
         yc = 0.05
+        if invert_yaxis:
+            yc = -0.05
         ttx = [x + xc for x in tx]
         tty = [y + yc for y in ty]
         ax.fill(ttx, tty, 'green')
 
         xc = 0.95
         yc = 0.95
+        if invert_yaxis:
+            yc = -0.95
         ttx = [x + xc for x in tx]
         tty = [y + yc for y in ty]
         ax.fill(ttx, tty, 'red')
 
-    #ax.set_xlim(0.0, 1.0)
-    #ax.set_ylim(0.0, 1.0)
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.0)
+    if invert_yaxis:
+        ax.set_ylim(0.0, -1.0)
+
     ax.set_axis_on()
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_aspect('equal')
     setup(ax)
     plt.tight_layout()
-    plt.savefig('random_scenarios.eps')
+    #plt.savefig('random_scenarios.pdf')
     plt.show()
