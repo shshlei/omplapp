@@ -41,8 +41,11 @@ import os
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Polygon
+from matplotlib.patches import Circle, Polygon, Rectangle, Ellipse
 from matplotlib.collections import PatchCollection
+
+from shapely.geometry import LineString as SLineString
+from descartes import PolygonPatch as SPolygonPatch
 
 from math import cos, sin, sqrt
 
@@ -96,7 +99,7 @@ if __name__ == "__main__":
         help='(Optional) Filename of the safe points.')
     args = parser.parse_args()
 
-    plt.style.use(['seaborn-deep', 'seaborn-paper'])
+    plt.style.use(['seaborn-v0_8-deep', 'seaborn-v0_8-paper'])
     plt.rcParams.update({'axes.grid': False})
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color'] #['#4C72B0', '#55A868', '#C44E52', '#8172B2', '#CCB974', '#64B5CD']
@@ -105,6 +108,12 @@ if __name__ == "__main__":
 
     tx = [0.0086579571682871, -0.02506512753291945, 0.012808997914287135, 0.0086579571682871];
     ty = [0.028723505664735693, 0.01648451945791818, -0.027128021904145316, 0.028723505664735693];
+
+    tx = [0.00232897858414355, -0.006532563766459726, 0.003404498957143567];
+    ty = [0.007361752832367847, 0.00424225972895909, -0.007564010952072658];
+
+    tx = [0.00432897858414355, -0.012532563766459726, 0.006404498957143567];
+    ty = [0.014361752832367847, 0.00824225972895909, -0.013564010952072658];
 
     fig, ax = plt.subplots(figsize=(1.8, 1.8))
     if args.collision_status:
@@ -122,6 +131,9 @@ if __name__ == "__main__":
         nobstacle = 0
         patches_circle = []
         patches_polygon = []
+        patches_ellipse = []
+        patches_capsule = []
+        patches_rectangle = []
         for line in open(args.scenario, 'r').readlines():
             l = line.strip()
             if not l:
@@ -151,26 +163,89 @@ if __name__ == "__main__":
                 y = np.array(vecs[1::2])
                 polygon = Polygon(np.array([x,y]).transpose(), True, color = 'gray')
                 patches_polygon.append(polygon)
+            elif params[0] == 2: # ellipse
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                a = params[4]
+                b = params[5]
+                ellipse = Ellipse((x, y), 2.0 * a, 2.0 * b, angle = 180.0 * yaw / np.pi, color = 'gray')
+                patches_ellipse.append(ellipse)
+            elif params[0] == 3: # capsule
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                r = params[4]
+                h = params[5]
+                s = sin(yaw)
+                c = cos(yaw)
+                p1 = (x - s * h, y + c * h)
+                p2 = (x + s * h, y - c * h)
+                capsule = SLineString([p1, p2]).buffer(r)
+                patches_capsule.append(SPolygonPatch(capsule, fc='gray', ec='gray'))
+            elif params[0] == 4: # rectangle
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                a = params[4]
+                b = params[5]
+                s = sin(yaw)
+                c = cos(yaw)
+                R = np.array(((c, -s), (s, c)))
+                xy = np.array(((-a, a, a, -a),(-b, -b, b, b)))
+                xy = R.dot(xy)
+                x1, y1 = xy
+                x1 = x1 + x
+                y1 = y1 + y
+                rect = Polygon(np.array([x1,y1]).transpose(), True, color = 'gray')
+                patches_rectangle.append(rect)
         pcc = PatchCollection(patches_circle, match_original=False)
         pcp = PatchCollection(patches_polygon, match_original=False)
+        pce = PatchCollection(patches_ellipse, match_original=False)
+        pccap = PatchCollection(patches_capsule, match_original=False)
+        pcrect = PatchCollection(patches_rectangle, match_original=False)
         if args.collision_status:
             pcc.set_color('#85878b')
             pcp.set_color('#85878b')
+            pce.set_color('#85878b')
+            pccap.set_color('#85878b')
+            pcrect.set_color('#85878b')
             pcc.set_alpha(0.3)
             pcp.set_alpha(0.3)
+            pce.set_alpha(0.3)
+            pccap.set_alpha(0.3)
+            pcrect.set_alpha(0.3)
             pcc.set_linestyle('dashed')
             pcp.set_linestyle('dashed')
+            pce.set_linestyle('dashed')
+            pccap.set_linestyle('dashed')
+            pcrect.set_linestyle('dashed')
             pcc.set_edgecolor('#73cdc9')
             pcp.set_edgecolor('#73cdc9')
+            pce.set_edgecolor('#73cdc9')
+            pccap.set_edgecolor('#73cdc9')
+            pcrect.set_edgecolor('#73cdc9')
             pcc.set_linewidth(0.4)
             pcp.set_linewidth(0.4)
+            pce.set_linewidth(0.4)
+            pccap.set_linewidth(0.4)
+            pcrect.set_linewidth(0.4)
             pcc.set_joinstyle('round')
             pcp.set_joinstyle('round')
+            pce.set_joinstyle('round')
+            pccap.set_joinstyle('round')
+            pcrect.set_joinstyle('round')
         else:
             pcc.set_color('gray')
             pcp.set_color('gray')
+            pce.set_color('gray')
+            pccap.set_color('gray')
+            pcrect.set_color('gray')
         ax.add_collection(pcc)
         ax.add_collection(pcp)
+        ax.add_collection(pce)
+        ax.add_collection(pccap)
+        ax.add_collection(pcrect)
     if args.contact_test:
         for line in open(args.contact_test, 'r').readlines():
             l = line.strip()
@@ -287,14 +362,23 @@ if __name__ == "__main__":
             ax.scatter(ttx[2], tty[2], s=10, c='#8CE69F', marker='s')
             ax.scatter(xc, yc, s=2.5, c='#B30059')
         ax.annotate("",
-                    xy=(0.7, 0.8), xycoords='data',
-                    xytext=(0.2, 0.8), textcoords='data',
+                    xy=(0.25, 0.6), xycoords='data',
+                    xytext=(0.18, 0.85), textcoords='data',
                     size=5, va="center", ha="center",
                     arrowprops=dict(arrowstyle="simple",
-                                    connectionstyle="arc3,rad=-0.25",
+                                    connectionstyle="arc3,rad=0.0",
                                     color='blue')
                     )
-        ax.text(.25, .97, "movement", transform=ax.transAxes, ha="left", va="top", fontsize=6, fontfamily='Times New Roman', fontweight=200)
+        ax.text(.10, .92, "robot", color='red', transform=ax.transAxes, ha="left", va="top", fontsize=6, fontfamily='Times New Roman', fontweight=200)
+        ax.annotate("",
+                    xy=(0.62, 0.6), xycoords='data',
+                    xytext=(0.78, 0.82), textcoords='data',
+                    size=5, va="center", ha="center",
+                    arrowprops=dict(arrowstyle="simple",
+                                    connectionstyle="arc3,rad=0.0",
+                                    color='blue')
+                    )
+        ax.text(.42, .92, "a new configuration", color='blue', transform=ax.transAxes, ha="left", va="top", fontsize=6, fontfamily='Times New Roman', fontweight=200)
         ax.annotate("",
                     xy=(0.35, 0.30), xycoords='data',
                     xytext=(0.50, 0.1), textcoords='data',
@@ -322,8 +406,7 @@ if __name__ == "__main__":
             circle = Circle((xc, yc), r, facecolor = color2, alpha=0.7, linestyle='--', linewidth=0.5, edgecolor='blue')
             ax.add_patch(circle)
             ax.scatter(xc, yc, s=0.5, c=color1)
-
-    if False:
+    if True:
         xc = 0.10
         yc = 0.10
         ttx = [x + xc for x in tx]
@@ -340,5 +423,5 @@ if __name__ == "__main__":
     setup(ax)
     plt.tight_layout()
     #plt.savefig('random_scenarios.eps')
-    #plt.savefig('random_scenarios.pdf')
+    plt.savefig('random_scenarios.pdf')
     plt.show()

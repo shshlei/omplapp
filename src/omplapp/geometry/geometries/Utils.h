@@ -63,6 +63,42 @@ namespace ompl
 
                         break;
                     }
+                    case GeometryType::ELLIPSE:
+                    {
+                        const Ellipse& s1 = static_cast<const Ellipse&>(geom1);
+                        const Ellipse& s2 = static_cast<const Ellipse&>(geom2);
+
+                        if (std::abs(s1.getA() - s2.getA()) > std::numeric_limits<double>::epsilon())
+                            return false;
+                        if (std::abs(s1.getB() - s2.getB()) > std::numeric_limits<double>::epsilon())
+                            return false;
+
+                        break;
+                    }
+                    case GeometryType::RECTANGLE:
+                    {
+                        const Rectangle& s1 = static_cast<const Rectangle&>(geom1);
+                        const Rectangle& s2 = static_cast<const Rectangle&>(geom2);
+
+                        if (std::abs(s1.getA() - s2.getA()) > std::numeric_limits<double>::epsilon())
+                            return false;
+                        if (std::abs(s1.getB() - s2.getB()) > std::numeric_limits<double>::epsilon())
+                            return false;
+
+                        break;
+                    }
+                    case GeometryType::CAPSULE:
+                    {
+                        const Capsule& s1 = static_cast<const Capsule&>(geom1);
+                        const Capsule& s2 = static_cast<const Capsule&>(geom2);
+
+                        if (std::abs(s1.getRadius() - s2.getRadius()) > std::numeric_limits<double>::epsilon())
+                            return false;
+                        if (std::abs(s1.getLength() - s2.getLength()) > std::numeric_limits<double>::epsilon())
+                            return false;
+
+                        break;
+                    }
                     case GeometryType::POLYGON:
                     {
                         const Polygon& s1 = static_cast<const Polygon&>(geom1);
@@ -70,25 +106,6 @@ namespace ompl
 
                         if (!s1.samePolygon(s2))
                             return false;
-
-                        break;
-                    }
-                    case GeometryType::POLYGONSET:
-                    {
-                        const PolygonSet& s1 = static_cast<const PolygonSet&>(geom1);
-                        const PolygonSet& s2 = static_cast<const PolygonSet&>(geom2);
-
-                        if (s1.getPolygonCount() != s2.getPolygonCount())
-                            return false;
-
-                        std::vector<Polygon> polygons1 = s1.getPolygons();
-                        std::vector<Polygon> polygons2 = s2.getPolygons();
-
-                        for (int i = 0; i < s1.getPolygonCount(); i++)
-                        {
-                            if (!polygons1[i].samePolygon(polygons2[i]))
-                                return false;
-                        }
 
                         break;
                     }

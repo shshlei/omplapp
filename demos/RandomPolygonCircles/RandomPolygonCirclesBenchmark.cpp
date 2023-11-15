@@ -63,7 +63,7 @@ namespace
     }
 }
 
-bool argParse(int argc, char** argv, std::string &env, bool &optimal, std::string &spaceType, std::string &robotType, double &radius);
+bool argParse(int argc, char** argv, std::string &env, std::string &robot, std::string &spaceType, double &checkResolution, bool &optimal, double &optimalT);
 
 const base::State* getState(const base::State* state, unsigned int /*index*/)
 {
@@ -73,17 +73,18 @@ const base::State* getState(const base::State* state, unsigned int /*index*/)
 int main(int argc, char* argv[])
 {
     bool optimal;
-    double radius;
+    double checkResolution;
+    double optimalT;
     std::string env;
     std::string spaceType;
-    std::string robotType;
+    std::string robot;
     // Parse the arguments, returns true if successful, false otherwise
-    if (!argParse(argc, argv, env, optimal, spaceType, robotType, radius))
+    if (!argParse(argc, argv, env, robot, spaceType, checkResolution, optimal, optimalT))
         return -1;
 
     std::string benchmark_name = "RandomPolygons";
     if (optimal)
-        benchmark_name += "Optimal";
+        benchmark_name = "Optimal" + benchmark_name;
 
     ob::StateSpacePtr space;
     ob::RealVectorBounds bounds(2);
@@ -119,32 +120,12 @@ int main(int argc, char* argv[])
     }
 
     auto si(std::make_shared<ob::SpaceInformation>(space));
-    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, app::Motion_2D, 0.0001, -0.01, space, getState);
+    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, app::Motion_2D, space, getState);
     svc->setEnvironmentFile(std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
-
-    if (robotType == "polygon")
-    {
-        int vcount = 3;
-        Eigen::Vector2d vecs[vcount];
-//        double x[3] = {5.0 * 0.0086579571682871, -5.0 * 0.02506512753291945, 5.0 * 0.012808997914287135};
-//        double y[3] = {5.0 * 0.028723505664735693, 5.0 * 0.01648451945791818, -5.0 * 0.027128021904145316}
-        double x[3] = {0.0086579571682871, -0.02506512753291945, 0.012808997914287135};
-        double y[3] = {0.028723505664735693, 0.01648451945791818, -0.027128021904145316};
-        for (int i = 0; i < vcount; i++)
-            vecs[i] = Eigen::Vector2d(x[i], y[i]);
-
-        auto polygon(std::make_shared<app::geometries::Polygon>());
-        polygon->set(vecs, vcount);
-        svc->addRobotShape(polygon);
-    }
-    else if (robotType == "circle")
-    {
-        auto circle(std::make_shared<app::geometries::Circle>(radius));
-        svc->addRobotShape(circle);
-    }
+    svc->addRobotShape(std::string(OMPLAPP_RESOURCE_DIR) + "/" + robot);
 
     si->setStateValidityChecker(svc);
-    si->setStateValidityCheckingResolution(0.01);
+    si->setStateValidityCheckingResolution(checkResolution);
     si->setup();
 
     ompl::geometric::SimpleSetup setup(si);
@@ -181,18 +162,18 @@ int main(int argc, char* argv[])
     if (optimal)
     {
         auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
-        obj->setCostThreshold(base::Cost(1.65));
+        obj->setCostThreshold(base::Cost(optimalT));
         setup.setOptimizationObjective(obj);
     }
 
     setup.setup();
 
-    double runtime_limit = 1.0, memory_limit = 1024;
-    int run_count = 20;
-    if (optimal)
-        runtime_limit = 20.0;
+    double runtime_limit = 200.0, memory_limit = 1024;
+    int run_count = 2;
+    //if (optimal)
+    //    runtime_limit = 20.0;
 
-    ompl::tools::Benchmark::Request request(runtime_limit, memory_limit, run_count, 0.1, true, true, false);
+    ompl::tools::Benchmark::Request request(runtime_limit, memory_limit, run_count, 0.01, true, true, false);
     ompl::tools::Benchmark b(setup, benchmark_name);
 
     if (optimal)
@@ -200,9 +181,9 @@ int main(int argc, char* argv[])
         /*
         addPlanner(b, std::make_shared<ompl::geometric::RRTstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::InformedRRTstar>(si));
+        addPlanner(b, std::make_shared<ompl::geometric::BITstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::PRMstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LazyPRMstar>(si));
-        addPlanner(b, std::make_shared<ompl::geometric::BITstar>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LBTRRT>(si));
         */
 
@@ -239,6 +220,10 @@ int main(int argc, char* argv[])
 
         {
             auto planner = std::make_shared<ompl::geometric::BiASEstar>(si);
+            planner->setAddIntermediateState(false);
+            planner->setUseBispace(false);
+            //planner->setBackRewire(false);
+            //planner->setUpdateNbCell(true);
             addPlanner(b, planner);
         }
 
@@ -248,19 +233,13 @@ int main(int argc, char* argv[])
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
             planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
             planner->setDistanceCertificate(svc->getDistanceCertificate());
-            planner->setUseCollisionCertificateChecker(true);
+            //planner->setUseCollisionCertificateChecker(true);
+            planner->setUseBispace(false);
             addPlanner(b, planner);
         }
+        */
 
-        {
-            auto planner = std::make_shared<ompl::geometric::BiHSCstar>(si);
-            planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
-            planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
-            planner->setDistanceCertificate(svc->getDistanceCertificate());
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
-
+        /*
         {
             auto planner = std::make_shared<ompl::geometric::HSCASEstar>(si);
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
@@ -290,36 +269,24 @@ int main(int argc, char* argv[])
     }
     else 
     {
+        addPlanner(b, std::make_shared<ompl::geometric::RRT>(si));
+        addPlanner(b, std::make_shared<ompl::geometric::RRTConnect>(si));
         /*
         addPlanner(b, std::make_shared<ompl::geometric::SBL>(si));
         addPlanner(b, std::make_shared<ompl::geometric::EST>(si));
         addPlanner(b, std::make_shared<ompl::geometric::BKPIECE1>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LBKPIECE1>(si));
-        addPlanner(b, std::make_shared<ompl::geometric::RRT>(si));
-        addPlanner(b, std::make_shared<ompl::geometric::RRTConnect>(si));
         addPlanner(b, std::make_shared<ompl::geometric::LazyRRT>(si));
         addPlanner(b, std::make_shared<ompl::geometric::PRM>(si));
         addPlanner(b, std::make_shared<ompl::geometric::STRIDE>(si));
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            planner->setLazyPath(true);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
         */
 
         /*
+        {
+            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
+            addPlanner(b, planner);
+        }
+
         {
             auto planner = std::make_shared<ompl::geometric::CellBispace>(si);
             addPlanner(b, planner);
@@ -330,11 +297,6 @@ int main(int argc, char* argv[])
             auto planner = std::make_shared<ompl::geometric::BiASE>(si);
             addPlanner(b, planner);
         }
-        addPlanner(b, std::make_shared<ompl::geometric::LBKPIECE1>(si));
-        addPlanner(b, std::make_shared<ompl::geometric::BKPIECE1>(si));
-        addPlanner(b, std::make_shared<ompl::geometric::RRT>(si));
-        addPlanner(b, std::make_shared<ompl::geometric::RRTConnect>(si));
-        addPlanner(b, std::make_shared<ompl::geometric::PRM>(si));
 
         /*
         {
@@ -342,59 +304,21 @@ int main(int argc, char* argv[])
             planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
             planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
             planner->setDistanceCertificate(svc->getDistanceCertificate());
-            planner->setUseCollisionCertificateChecker(true);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::BiHSC>(si);
-            planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
-            planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
-            planner->setDistanceCertificate(svc->getDistanceCertificate());
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::HSCASE>(si);
-            planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
-            planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
-            planner->setDistanceCertificate(svc->getDistanceCertificate());
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::HSCASE>(si);
-            planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
-            planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
-            planner->setDistanceCertificate(svc->getDistanceCertificate());
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::HSCASE>(si);
-            planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
-            planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
-            planner->setDistanceCertificate(svc->getDistanceCertificate());
-            planner->setLazyNode(true);
+            //planner->setUseCollisionCertificateChecker(true);
+            planner->setUseBispace(false);
             addPlanner(b, planner);
         }
         */
     }
 
     b.benchmark(request);
-    if (optimal)
-        b.saveResultsToFile((benchmark_name + "biasestar" + ".log").c_str());
-    else
-        b.saveResultsToFile((benchmark_name + "biase" + ".log").c_str());
+    b.saveResultsToFile((benchmark_name + ".log").c_str());
 
     return 0;
 }
 
 /** Parse the command line arguments into a string for an output file and the planner/optimization types */
-bool argParse(int argc, char** argv, std::string &env, bool &optimal,
-        std::string &spaceType, std::string &robotType, double &radius)
+bool argParse(int argc, char** argv, std::string &env, std::string &robot, std::string &spaceType, double &checkResolution, bool &optimal, double &optimalT)
 {
     namespace bpo = boost::program_options;
 
@@ -403,10 +327,11 @@ bool argParse(int argc, char** argv, std::string &env, bool &optimal,
     desc.add_options()
         ("help,h", "produce help message")
         ("env,e", bpo::value<std::string>()->default_value("random_scenarios.ply"), "(Optional) Specify the polygon and circle environment, defaults to random_scenarios.ply if not given.")
-        ("optimal,o", bpo::value<bool>()->default_value(false), "(Optional) Specify if it is an optimal benchmark.")
+        ("robot", bpo::value<std::string>()->default_value("robot_triangle1.ply"), "(Optional) Specify the robot, defaults to robot_triangle1.ply if not given.")
         ("spacetype,s", bpo::value<std::string>()->default_value("RealVector2"), "(Optional) Specify the planning space type, default to RealVector2 if not given. Valid options are RealVector2, SE2, Dubins, ReedsShepp.")
-        ("robottype", bpo::value<std::string>()->default_value("polygon"), "(Optional) Specify the robot type, default to polygon if not given. Valid options are polygon, circle.")
-        ("radius", bpo::value<double>()->default_value(0.0), "(Optional) Specify the circle robot radius. Defaults to 0 and must be greater than 0.");
+        ("checkResolution", bpo::value<double>()->default_value(0.01), "(Optional) Specify the collision checking resolution. Defaults to 0.01 and must be greater than 0.")
+        ("optimal,o", bpo::value<bool>()->default_value(false), "(Optional) Specify if it is an optimal benchmark.")
+        ("optimalT", bpo::value<double>()->default_value(1.30), "(Optional) Specify the optimal path length threshold. Defaults to 1.30 and must be greater than 0.");
     bpo::variables_map vm;
     bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
     bpo::notify(vm);
@@ -419,7 +344,7 @@ bool argParse(int argc, char** argv, std::string &env, bool &optimal,
     }
 
     env = vm["env"].as<std::string>();
-    optimal = vm["optimal"].as<bool>();
+    robot = vm["robot"].as<std::string>();
 
     spaceType = vm["spacetype"].as<std::string>();
     if (boost::iequals("RealVector2", spaceType))
@@ -439,21 +364,9 @@ bool argParse(int argc, char** argv, std::string &env, bool &optimal,
         spaceType = "ReedsShepp";
     }
 
-    robotType = vm["robottype"].as<std::string>();
-    if (boost::iequals("polygon", robotType))
-    {
-        robotType = "polygon";
-    }
-    else if (boost::iequals("circle", robotType))
-    {
-        robotType = "circle";
-    }
-    else
-    {
-        robotType = "polygon";
-    }
-
-    radius = vm["radius"].as<double>();
+    checkResolution = vm["checkResolution"].as<double>();
+    optimal = vm["optimal"].as<bool>();
+    optimalT = vm["optimalT"].as<double>();
 
     return true;
 }

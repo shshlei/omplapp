@@ -1,0 +1,7 @@
+# Random 2D scenarios with circle, polygon, ellipse, capsule and rectangle shapes
+# (feel free to add / change comments, but leave the first line as it is!)
+#
+numbers 2
+shapes
+4 0.5 0.24375 0.0 0.1 0.24375
+4 0.5 0.75625 0.0 0.1 0.24375

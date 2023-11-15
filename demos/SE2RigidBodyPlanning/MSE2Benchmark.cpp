@@ -90,7 +90,7 @@ void benchmarkMaze(bool optimal, std::string &benchmark_name, app::SE2RigidBodyP
     setup.setup();
 
     runtime_limit = 50.0;
-    memory_limit = 10000.0;
+    memory_limit = 1024.0;
     run_count = 20;
     if (optimal)
         runtime_limit = 20.0;
@@ -130,10 +130,10 @@ void benchmarkBarriers(bool optimal, std::string &benchmark_name, app::SE2RigidB
     setup.setup();
 
     runtime_limit = 20.0;
-    memory_limit = 10000.0;
+    memory_limit = 1024.0;
     run_count = 20;
     if (optimal)
-        runtime_limit = 100.0;
+        runtime_limit = 20.0;
 }
 
 void benchmarkRandomPolygons(bool optimal, std::string &benchmark_name, app::SE2RigidBodyPlanning &setup, double &runtime_limit,
@@ -226,9 +226,7 @@ int main(int argc, char* argv[])
 
     // Parse the arguments, returns true if successful, false otherwise
     if (!argParse(argc, argv, env, optimal))
-    {
         return -1;
-    }
 
     ompl::app::SE2RigidBodyPlanning setup;
     std::string benchmark_name;
@@ -268,26 +266,9 @@ int main(int argc, char* argv[])
             auto planner = std::make_shared<ompl::geometric::RRTBispacestar>(si);
             addPlanner(b, planner);
         }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispacestar>(si);
-            planner->setLazyPath(true);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispacestar>(si);
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
         */
 
         /*
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispacestar>(si);
-            addPlanner(b, planner);
-        }
-
         {
             auto planner = std::make_shared<ompl::geometric::CellBispacestar>(si);
             addPlanner(b, planner);
@@ -347,9 +328,8 @@ int main(int argc, char* argv[])
     }
     else 
     {
-        addPlanner(b, std::make_shared<ompl::geometric::PRM>(si));
-
         /*
+        addPlanner(b, std::make_shared<ompl::geometric::PRM>(si));
         addPlanner(b, std::make_shared<ompl::geometric::SBL>(si));
         addPlanner(b, std::make_shared<ompl::geometric::EST>(si));
         addPlanner(b, std::make_shared<ompl::geometric::BKPIECE1>(si));
@@ -359,26 +339,14 @@ int main(int argc, char* argv[])
         addPlanner(b, std::make_shared<ompl::geometric::LazyRRT>(si));
         addPlanner(b, std::make_shared<ompl::geometric::PRM>(si));
         addPlanner(b, std::make_shared<ompl::geometric::STRIDE>(si));
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            planner->setLazyPath(true);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
         */
 
         /*
+        {
+            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
+            addPlanner(b, planner);
+        }
+
         {
             auto planner = std::make_shared<ompl::geometric::CellBispace>(si);
             addPlanner(b, planner);
@@ -387,10 +355,19 @@ int main(int argc, char* argv[])
 
         /*
         {
-            auto planner = std::make_shared<ompl::geometric::BiASE>(si);
+            auto planner = std::make_shared<ompl::geometric::BiHSC>(si);
+            planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
+            planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
+            planner->setDistanceCertificate(svc->getDistanceCertificate());
+            planner->setUseCollisionCertificateChecker(true);
             addPlanner(b, planner);
         }
         */
+
+        {
+            auto planner = std::make_shared<ompl::geometric::BiASE>(si);
+            addPlanner(b, planner);
+        }
 
         /*
         {
@@ -441,9 +418,9 @@ int main(int argc, char* argv[])
 
     b.benchmark(request);
     if (optimal)
-        b.saveResultsToFile((benchmark_name + "biasestar" + ".log").c_str());
+        b.saveResultsToFile((benchmark_name + "BiASEstar" + ".log").c_str());
     else
-        b.saveResultsToFile((benchmark_name + "biase" + ".log").c_str());
+        b.saveResultsToFile((benchmark_name + "BiASE" + ".log").c_str());
 
     return 0;
 }

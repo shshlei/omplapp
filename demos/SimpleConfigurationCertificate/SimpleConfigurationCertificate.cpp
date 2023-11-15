@@ -120,7 +120,7 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
 }
 
 // Parse the command-line arguments
-bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param, unsigned int &run_cycle, bool &doDistanceTest);
+bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param, unsigned int &run_cycle, bool &doDistanceTest, double &checkResolution, double &optimalT);
 
 int main(int argc, char* argv[])
 {
@@ -128,12 +128,14 @@ int main(int argc, char* argv[])
     bool optimal;
     bool default_param;
     double runTime;
+    double checkResolution;
+    double optimalT;
     PlannerType plannerType;
     std::string env;
     unsigned int run_cycle;
     bool doDistanceTest;
     // Parse the arguments, returns true if successful, false otherwise
-    if (!argParse(argc, argv, runTime, plannerType, optimal, env, default_param, run_cycle, doDistanceTest))
+    if (!argParse(argc, argv, runTime, plannerType, optimal, env, default_param, run_cycle, doDistanceTest, checkResolution, optimalT))
         return -1;
 
     auto space(std::make_shared<ob::RealVectorStateSpace>(2));
@@ -150,7 +152,7 @@ int main(int argc, char* argv[])
     svc->setRobotShape(circle);
 
     si->setStateValidityChecker(svc);
-    si->setStateValidityCheckingResolution(0.01);
+    si->setStateValidityCheckingResolution(checkResolution);
     si->setup();
 
     if (doDistanceTest) // check if the distance function is correct
@@ -192,7 +194,7 @@ int main(int argc, char* argv[])
     if (optimal)
     {
         auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
-        obj->setCostThreshold(base::Cost(1.55));
+        obj->setCostThreshold(base::Cost(optimalT));
         setup.setOptimizationObjective(obj);
     }
 
@@ -221,7 +223,7 @@ int main(int argc, char* argv[])
         {
             std::ofstream out(boost::str(boost::format("pathsol_%i.txt") % i).c_str());
             og::PathGeometric &p = setup.getSolutionPath();
-            p.interpolate();
+            //p.interpolate();
             p.printAsMatrix(out);
             out.close();
         }
@@ -236,7 +238,7 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param, unsigned int &run_cycle, bool &doDistanceTest)
+bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param, unsigned int &run_cycle, bool &doDistanceTest, double &checkResolution, double &optimalT)
 {
     namespace bpo = boost::program_options;
 
@@ -249,7 +251,9 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
         ("runtime,t", bpo::value<double>()->default_value(1.0), "(Optional) Specify the runtime in seconds. Defaults to 1 and must be greater than 0.")
         ("planner,p", bpo::value<std::string>()->default_value("RRTstar"), "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are RRT, RRTstar, RRTConnect.")
         ("run_cycle,r", bpo::value<unsigned int>()->default_value(1), "(Optional) Specify the run cycles.")
-        ("doDistanceTest", bpo::value<bool>()->default_value(false), "(Optional) Specify if do the distance test.");
+        ("doDistanceTest", bpo::value<bool>()->default_value(false), "(Optional) Specify if do the distance test.")
+        ("checkResolution", bpo::value<double>()->default_value(0.01), "(Optional) Specify the collision checking resolution. Defaults to 0.01 and must be greater than 0.")
+        ("optimalT", bpo::value<double>()->default_value(1.30), "(Optional) Specify the optimal path length threshold. Defaults to 1.30 and must be greater than 0.");
     bpo::variables_map vm;
     bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
     bpo::notify(vm);
@@ -300,6 +304,7 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
     }
 
     doDistanceTest = vm["doDistanceTest"].as<bool>();
-
+    checkResolution = vm["checkResolution"].as<double>();
+    optimalT = vm["optimalT"].as<double>();
     return true;
 }

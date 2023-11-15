@@ -92,6 +92,16 @@ namespace ompl
                 return certificateR_;
             }
 
+            void setUseCollisionCertificateChecker(bool use)
+            {
+                useCollisionCertificateChecker_ = use;
+            }
+
+            bool getUseCollisionCertificateChecker() const
+            {
+                return useCollisionCertificateChecker_;
+            }
+
         protected:
             struct SafetyCertificate 
             {
@@ -177,7 +187,7 @@ namespace ompl
             /** \brief The maximum length of a motion to be added to a tree */
             double maxDistance_{0.};
 
-            double certificateR_{0.005};
+            double certificateR_{0.0001};
 
             /** \brief The random number generator */
             RNG rng_;
@@ -187,6 +197,8 @@ namespace ompl
 
             /** \brief Distance between the nearest pair of start tree and goal tree nodes. */
             double distanceBetweenTrees_;
+
+            bool useCollisionCertificateChecker_{false};
         };
     }
 }

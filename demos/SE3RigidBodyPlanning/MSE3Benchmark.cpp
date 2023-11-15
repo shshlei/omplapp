@@ -91,10 +91,10 @@ void benchmarkHome(bool optimal, std::string &benchmark_name, app::SE3RigidBodyP
     setup.setup();
 
     runtime_limit = 200.0;
-    memory_limit = 10000.0;  // set high because memory usage is not always estimated correctly
+    memory_limit = 1024.0;
     run_count = 20;
     if (optimal)
-        runtime_limit = 2000.0;
+        runtime_limit = 100.0;
 }
 
 void benchmarkCubicles(bool optimal, std::string &benchmark_name, app::SE3RigidBodyPlanning &setup, double &runtime_limit,
@@ -173,10 +173,10 @@ void benchmarkTwistycool(bool optimal, std::string &benchmark_name, app::SE3Rigi
     setup.setup();
 
     runtime_limit = 500.0;
-    memory_limit = 10000.0;  // set high because memory usage is not always estimated correctly
+    memory_limit = 1024.0;
     run_count = 20;
     if (optimal)
-        runtime_limit = 2000.0;
+        runtime_limit = 1000.0;
 }
 
 void benchmarkTwistycooler(bool optimal, std::string &benchmark_name, app::SE3RigidBodyPlanning &setup, double &runtime_limit,
@@ -421,7 +421,7 @@ int main(int argc, char* argv[])
             setup.getGeometricComponentStateSpace(), setup.getGeometricStateExtractor(), setup.getGeometrySpecification());
     setup.setStateValidityChecker(svc);
 
-    ompl::tools::Benchmark::Request request(runtime_limit, memory_limit, run_count, 0.2, true, true, false);
+    ompl::tools::Benchmark::Request request(runtime_limit, memory_limit, run_count, 0.5, true, true, false);
     ompl::tools::Benchmark b(setup, benchmark_name);
 
     if (optimal)
@@ -456,25 +456,6 @@ int main(int argc, char* argv[])
         }
 
         {
-            auto planner = std::make_shared<ompl::geometric::RRTBispacestar>(si);
-            planner->setLazyPath(true);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispacestar>(si);
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
-        */
-
-        /*
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispacestar>(si);
-            addPlanner(b, planner);
-        }
-
-        {
             auto planner = std::make_shared<ompl::geometric::CellBispacestar>(si);
             addPlanner(b, planner);
         }
@@ -485,14 +466,6 @@ int main(int argc, char* argv[])
             auto planner = std::make_shared<ompl::geometric::BiASEstar>(si);
             addPlanner(b, planner);
         }
-
-        /*
-        {
-            auto planner = std::make_shared<ompl::geometric::BiASEstar>(si);
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
-        */
 
         /*
         {
@@ -543,25 +516,7 @@ int main(int argc, char* argv[])
         addPlanner(b, std::make_shared<ompl::geometric::EST>(si));
         addPlanner(b, std::make_shared<ompl::geometric::BKPIECE1>(si));
         addPlanner(b, std::make_shared<ompl::geometric::STRIDE>(si));
-        */
         addPlanner(b, std::make_shared<ompl::geometric::RRT>(si));
-        /*
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            planner->setLazyPath(true);
-            addPlanner(b, planner);
-        }
-
-        {
-            auto planner = std::make_shared<ompl::geometric::RRTBispace>(si);
-            planner->setLazyNode(true);
-            addPlanner(b, planner);
-        }
         */
 
         /*
@@ -577,20 +532,20 @@ int main(int argc, char* argv[])
         */
 
         /*
-        for (unsigned int i = 20; i <= 90; i+= 10)
         {
-            auto planner = std::make_shared<ompl::geometric::BiASE>(si);
-            planner->setNumI(i);
+            auto planner = std::make_shared<ompl::geometric::BiHSC>(si);
+            planner->setSafetyCertificateChecker(svc->getSafetyCertificateChecker());
+            planner->setCollisionCertificateChecker(svc->getCollisionCertificateChecker());
+            planner->setDistanceCertificate(svc->getDistanceCertificate());
+            planner->setUseCollisionCertificateChecker(true);
             addPlanner(b, planner);
         }
         */
 
-        /*
         {
             auto planner = std::make_shared<ompl::geometric::BiASE>(si);
             addPlanner(b, planner);
         }
-        */
 
         /*
         {
@@ -650,9 +605,9 @@ int main(int argc, char* argv[])
 
     b.benchmark(request);
     if (optimal)
-        b.saveResultsToFile((benchmark_name  + "biasestar" + ".log").c_str());
+        b.saveResultsToFile((benchmark_name  + "BiASEstar" + ".log").c_str());
     else
-        b.saveResultsToFile((benchmark_name  + "biase" + ".log").c_str());
+        b.saveResultsToFile((benchmark_name  + "BiASE" + ".log").c_str());
     return 0;
 }
 

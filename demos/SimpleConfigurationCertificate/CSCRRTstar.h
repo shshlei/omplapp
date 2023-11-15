@@ -308,6 +308,16 @@ namespace ompl
                 return certificateR_;
             }
 
+            void setUseCollisionCertificateChecker(bool use)
+            {
+                useCollisionCertificateChecker_ = use;
+            }
+
+            bool getUseCollisionCertificateChecker() const
+            {
+                return useCollisionCertificateChecker_;
+            }
+
         protected:
 
             /** \brief Representation of a configuration space certificate */
@@ -442,7 +452,7 @@ namespace ompl
              * available) */
             double goalBias_{.05};
 
-            double certificateR_{0.005};
+            double certificateR_{0.0001};
 
             /** \brief The maximum length of a motion to be added to a tree */
             double maxDistance_{0.};
@@ -476,6 +486,8 @@ namespace ompl
 
             /** \brief A list of states in the tree that satisfy the goal condition */
             std::vector<Motion *> goalMotions_;
+
+            bool useCollisionCertificateChecker_{false};
 
             /** \brief The status of the tree pruning option. */
             bool useTreePruning_{false};

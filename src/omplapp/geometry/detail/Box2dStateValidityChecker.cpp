@@ -9,7 +9,6 @@
 
 #include <ompl/util/Console.h>
 
-#include <thread>
 #include <limits>
 #include <algorithm>
 
@@ -46,29 +45,44 @@ namespace ompl
             return false;
         }
 
+        bool Box2dStateValidityChecker::addRobotShape(const std::string &robot)
+        {
+            const boost::filesystem::path path = findMeshFile(robot);
+            if (path.empty())
+            {
+                OMPL_ERROR("File '%s' not found in mesh path.", robot.c_str());
+                return false;
+            }
+
+            std::ifstream file(path.string().c_str(), std::ios_base::binary | std::ios_base::in);
+            if (!file.is_open())
+            {
+                OMPL_ERROR("Filestream to %s is not open, nothing read.", robot.c_str());
+                return false;
+            }
+
+            std::string line;
+            std::getline(file, line);
+
+            robotCount_++;
+            std::string name = "Robot" + std::to_string(robotCount_);
+            if (createShape(file, name, true))
+            {
+                names_.push_back(name);
+                return true;
+            }
+            robotCount_--;
+            return false;
+        }
+
         bool Box2dStateValidityChecker::isValid(const ompl::base::State *state) const
         {
-            unsigned long int hash = std::hash<std::thread::id>{}(std::this_thread::get_id());
-            collision_box2d::Box2dDiscreteBVHManagerPtr cm;
-            mutex_.lock();
-            auto it = collision_managers_.find(hash);
-            if (it == collision_managers_.end())
-            {
-                cm = collision_manager_->clone();
-                collision_managers_[hash] = cm;
-            }
-            else
-            {
-                cm = it->second;
-            }
-            mutex_.unlock();
-
             for (unsigned int i = 0; i < names_.size(); i++)
             {
                 Eigen::Isometry2d tf = calculateCurrentTransform(state, i); 
-                cm->setCollisionObjectsTransform(names_[i], tf);
+                collision_manager_->setCollisionObjectsTransform(names_[i], tf);
             }
-            return !cm->contactTest();
+            return !collision_manager_->contactTest();
         }
 
         bool Box2dStateValidityChecker::isValid(const ompl::base::State *state, double &dist) const
@@ -106,29 +120,14 @@ namespace ompl
 
         void Box2dStateValidityChecker::clearance(const ompl::base::State *state, ompl::base::ContactResultVector &contact_vector) const
         {
-            unsigned long int hash = std::hash<std::thread::id>{}(std::this_thread::get_id());
-            collision_box2d::Box2dDiscreteBVHManagerPtr cm;
-            mutex_.lock();
-            auto it = collision_managers_.find(hash);
-            if (it == collision_managers_.end())
-            {
-                cm = collision_manager_->clone();
-                collision_managers_[hash] = cm;
-            }
-            else
-            {
-                cm = it->second;
-            }
-            mutex_.unlock();
-
             for (unsigned int i = 0; i < names_.size(); i++)
             {
                 Eigen::Isometry2d tf = calculateCurrentTransform(state, i); 
-                cm->setCollisionObjectsTransform(names_[i], tf);
+                collision_manager_->setCollisionObjectsTransform(names_[i], tf);
             }
             contact_vector.clear();
             base::ContactResult contact;
-            if (cm->contactTest(contact))
+            if (collision_manager_->contactTest(contact))
                 contact_vector.push_back(contact);
         }
 
@@ -392,12 +391,12 @@ namespace ompl
 
         bool Box2dStateValidityChecker::read(std::istream &s)
         {
-            const std::string& fileHeader = "# Random polygons and circles file";
+            const std::string& fileHeader = "# Random 2D scenarios with circle, polygon, ellipse, capsule and rectangle shapes";
 
             // check if first line valid:
             std::string line;
             std::getline(s, line);
-            if (line.compare(0, fileHeader.length(), fileHeader) !=0)
+            if (line.compare(0, fileHeader.length(), fileHeader) != 0)
             {
                 OMPL_ERROR("First line of file header does not start with %s", fileHeader);
                 return false;
@@ -408,53 +407,92 @@ namespace ompl
                 return false;
 
             int shapec = 0;
-            int type = 0;
-            int count = 0;
-            double x = 0.0, y = 0.0, r = 0.0;
             while (s.good())
             {
-                s >> type;
-                if (!s.good())
+                shapec++;
+                std::string name = "Obstacles" + std::to_string(shapec);
+                if (!createShape(s, name))
                     break;
-                b2Shape *shape = nullptr;
-                std::string name = "";
-                if (type == 0)
-                {
-                    s >> x >> y >> r;
-                    b2CircleShape *cshape = new b2CircleShape();
-                    cshape->SetRadius(b2Scalar(r));
-                    cshape->m_p.Set(b2Scalar(x), b2Scalar(y));
-                    shape = cshape;
-                    shapec++;
-                    name = "Circle" + std::to_string(shapec);
-                }
-                else if (type == 1) 
-                {
-                    s >> count; 
-                    b2Vec2 vecs[count];
-                    for (int i = 0; i < count; i++)
-                    {
-                        s >> x >> y;
-                        vecs[i].Set(b2Scalar(x), b2Scalar(y));
-                    }
-                    b2PolygonShape *pshape = new b2PolygonShape();
-                    pshape->Set(vecs, count);
-                    shape = pshape;
-                    shapec++;
-                    name = "Polygon" + std::to_string(shapec);
-                }
-
-                if (shape != nullptr)
-                {
-                    collision_manager_->getBox2dBroadphse()->AddBody(name, shape, false);
-                    delete shape;
-                }
             }
 
             if (numbers != collision_manager_->getBox2dBroadphse()->GetBodyCount())
                 OMPL_WARN("The shape number is wrong in this file, %d VS %d!", numbers, collision_manager_->getBox2dBroadphse()->GetBodyCount());
 
             return true;
+        }
+
+        bool Box2dStateValidityChecker::createShape(std::istream &s, std::string& name, bool active)
+        {
+            int type = 0, count = 0;
+            double x = 0.0, y = 0.0, yaw = 0.0, r = 0.0, h = 0.0, a = 0.0, b = 0.0;
+            s >> type;
+            if (!s.good())
+                return false;
+            b2Shape *shape = nullptr;
+            b2Transform xf = b2Transform::Identity();
+            bool polygon = false;
+            if (type == 0)
+            {
+                s >> x >> y >> r;
+                yaw = 0.0;
+                b2CircleShape *cshape = new b2CircleShape(b2Scalar(r));
+                xf.translation() = b2Vec2(b2Scalar(x), b2Scalar(y));
+                shape = cshape;
+                name += "Circle";
+            }
+            else if (type == 1) 
+            {
+                polygon = true;
+                s >> count; 
+                b2Vec2 vecs[count];
+                for (int i = 0; i < count; i++)
+                {
+                    s >> x >> y;
+                    vecs[i] = b2Vec2(b2Scalar(x), b2Scalar(y));
+                }
+                b2PolygonShape *pshape = new b2PolygonShape();
+                pshape->Set(vecs, count);
+                shape = pshape;
+                name += "Polygon";
+            }
+            else if (type == 2) // ellipse
+            {
+                s >> x >> y >> yaw >> a >> b;
+                b2EllipseShape *eshape = new b2EllipseShape(b2Scalar(a), b2Scalar(b));
+                xf.translation() = b2Vec2(b2Scalar(x), b2Scalar(y));
+                xf.linear() = b2Rot(b2Scalar(yaw)).toRotationMatrix();
+                shape = eshape;
+                name += "Ellipse";
+            }
+            else if (type == 3) // capsule 
+            {
+                s >> x >> y >> yaw >> r >> h;
+                b2CapsuleShape *cshape = new b2CapsuleShape(b2Scalar(r), b2Scalar(h));
+                xf.translation() = b2Vec2(b2Scalar(x), b2Scalar(y));
+                xf.linear() = b2Rot(b2Scalar(yaw)).toRotationMatrix();
+                shape = cshape;
+                name += "Capsule";
+            }
+            else if (type == 4) // rectangle 
+            {
+                s >> x >> y >> yaw >> a >> b;
+                b2RectangleShape *rectshape = new b2RectangleShape(b2Scalar(a), b2Scalar(b));
+                xf.translation() = b2Vec2(b2Scalar(x), b2Scalar(y));
+                xf.linear() = b2Rot(b2Scalar(yaw)).toRotationMatrix();
+                shape = rectshape;
+                name += "Rectangle";
+            }
+            else 
+                OMPL_ERROR("Error reading Random 2D Scenarios : the shape type %d is not hnown !", type);
+            if (shape != nullptr)
+            {
+                collision_manager_->getBox2dBroadphse()->AddBody(name, shape, b2Transform::Identity(), active);
+                if (!polygon)
+                    collision_manager_->getBox2dBroadphse()->SetBodyTransform(name, xf);
+                delete shape;
+                return true;
+            }
+            return false;
         }
 
         bool Box2dStateValidityChecker::readHeader(std::istream& s, int& numbers)
@@ -488,18 +526,17 @@ namespace ompl
                     s >> numbers;
                 else
                 {
-                    OMPL_WARN("Unknown keyword in Random Polygons and Circles header, skipping: %s", token);
+                    OMPL_WARN("Unknown keyword in Random 2D Scenarios header, skipping: %s", token);
                     char c;
                     do {
                         c = s.get();
                     } while(s.good() && (c != '\n'));
-
                 }
             }
 
             if (!headerRead)
             {
-                OMPL_ERROR("Error reading Random Polygons and Circles header!");
+                OMPL_ERROR("Error reading Random 2D Scenarios header!");
                 return false;
             }
 

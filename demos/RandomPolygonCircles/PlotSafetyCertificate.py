@@ -42,8 +42,12 @@ import os
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Polygon
+from matplotlib.patches import Circle, Polygon, Rectangle, Ellipse
 from matplotlib.collections import PatchCollection
+
+from shapely.geometry import LineString as SLineString
+from descartes import PolygonPatch as SPolygonPatch
+
 
 from math import cos, sin, sqrt
 
@@ -102,7 +106,7 @@ if __name__ == "__main__":
         help='(Optional) Filename of the collision certificate spheres.')
     args = parser.parse_args()
 
-    plt.style.use(['seaborn-deep', 'seaborn-paper'])
+    plt.style.use(['seaborn-v0_8-deep', 'seaborn-v0_8-paper'])
     plt.rcParams.update({'axes.grid': False})
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color']
@@ -177,6 +181,9 @@ if __name__ == "__main__":
         nobstacle = 0
         patches_circle = []
         patches_polygon = []
+        patches_ellipse = []
+        patches_capsule = []
+        patches_rectangle = []
         for line in open(args.scenario, 'r').readlines():
             l = line.strip()
             if not l:
@@ -196,6 +203,8 @@ if __name__ == "__main__":
                 x = params[1]
                 y = params[2]
                 r = params[3]
+                if invert_yaxis:
+                    y = -y
                 circle = Circle((x, y), r, color = 'gray')
                 patches_circle.append(circle)
             elif params[0] == 1: # polygon
@@ -204,28 +213,106 @@ if __name__ == "__main__":
                 vecs = params[2:]
                 x = vecs[::2]
                 y = np.array(vecs[1::2])
+                if invert_yaxis:
+                    y = list(-np.array(vecs[1::2]))
                 polygon = Polygon(np.array([x,y]).transpose(), True, color = 'gray')
                 patches_polygon.append(polygon)
+            elif params[0] == 2: # ellipse
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                a = params[4]
+                b = params[5]
+                if invert_yaxis:
+                    ellipse = Ellipse((x, -y), 2.0 * a, 2.0 * b, angle = -180.0 * yaw / np.pi, color = 'gray')
+                else:
+                    ellipse = Ellipse((x, y), 2.0 * a, 2.0 * b, angle = 180.0 * yaw / np.pi, color = 'gray')
+                patches_ellipse.append(ellipse)
+            elif params[0] == 3: # capsule
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                r = params[4]
+                h = params[5]
+                s = sin(yaw)
+                c = cos(yaw)
+                if invert_yaxis:
+                    p1 = (x - s * h, - y - c * h)
+                    p2 = (x + s * h, - y + c * h)
+                else:
+                    p1 = (x - s * h, y + c * h)
+                    p2 = (x + s * h, y - c * h)
+                capsule = SLineString([p1, p2]).buffer(r)
+                patches_capsule.append(SPolygonPatch(capsule, fc='gray', ec='gray'))
+            elif params[0] == 4: # rectangle
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                a = params[4]
+                b = params[5]
+                s = sin(yaw)
+                c = cos(yaw)
+                R = np.array(((c, -s), (s, c)))
+                if invert_yaxis:
+                    xy = np.array(((-a, a, a, -a),(b, b, -b, -b)))
+                else:
+                    xy = np.array(((-a, a, a, -a),(-b, -b, b, b)))
+                xy = R.dot(xy)
+                x1, y1 = xy
+                x1 = x1 + x
+                if invert_yaxis:
+                    y1 = y1 - y
+                else:
+                    y1 = y1 + y
+                rect = Polygon(np.array([x1,y1]).transpose(), True, color = 'gray')
+                patches_rectangle.append(rect)
         pcc = PatchCollection(patches_circle, match_original=False)
         pcp = PatchCollection(patches_polygon, match_original=False)
+        pce = PatchCollection(patches_ellipse, match_original=False)
+        pccap = PatchCollection(patches_capsule, match_original=False)
+        pcrect = PatchCollection(patches_rectangle, match_original=False)
         if args.collision_status:
             pcc.set_color('#85878b')
             pcp.set_color('#85878b')
+            pce.set_color('#85878b')
+            pccap.set_color('#85878b')
+            pcrect.set_color('#85878b')
             pcc.set_alpha(0.3)
             pcp.set_alpha(0.3)
+            pce.set_alpha(0.3)
+            pccap.set_alpha(0.3)
+            pcrect.set_alpha(0.3)
             pcc.set_linestyle('dashed')
             pcp.set_linestyle('dashed')
+            pce.set_linestyle('dashed')
+            pccap.set_linestyle('dashed')
+            pcrect.set_linestyle('dashed')
             pcc.set_edgecolor('#73cdc9')
             pcp.set_edgecolor('#73cdc9')
+            pce.set_edgecolor('#73cdc9')
+            pccap.set_edgecolor('#73cdc9')
+            pcrect.set_edgecolor('#73cdc9')
             pcc.set_linewidth(0.4)
             pcp.set_linewidth(0.4)
+            pce.set_linewidth(0.4)
+            pccap.set_linewidth(0.4)
+            pcrect.set_linewidth(0.4)
             pcc.set_joinstyle('round')
             pcp.set_joinstyle('round')
+            pce.set_joinstyle('round')
+            pccap.set_joinstyle('round')
+            pcrect.set_joinstyle('round')
         else:
             pcc.set_color('gray')
             pcp.set_color('gray')
+            pce.set_color('gray')
+            pccap.set_color('gray')
+            pcrect.set_color('gray')
         ax.add_collection(pcc)
         ax.add_collection(pcp)
+        ax.add_collection(pce)
+        ax.add_collection(pccap)
+        ax.add_collection(pcrect)
     if args.safety_certificate:
         xyrs = []
         for line in open(args.safety_certificate, 'r').readlines():

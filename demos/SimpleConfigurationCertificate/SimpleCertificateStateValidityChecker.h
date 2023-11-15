@@ -37,7 +37,6 @@
 #ifndef SIMPLECERTIFICATE_STATE_VALIDITY_CHECKER_
 #define SIMPLECERTIFICATE_STATE_VALIDITY_CHECKER_
 
-#include <ompl/base/Contact.h>
 #include <ompl/base/StateValidityChecker.h>
 #include <omplapp/collision/Box2dDiscreteBVHManager.h>
 
@@ -60,16 +59,12 @@ namespace ompl
 
             bool isValid(const ompl::base::State *state, double &dist) const override;
 
-            //bool isValid(const ompl::base::State *state, ompl::base::ContactResultVector &contact_vector, double &dist) const override;
-
             double clearance(const ompl::base::State *state) const override;
-
-            //void clearance(const ompl::base::State *state, ompl::base::ContactResultVector &contact_vector) const override;
 
             void setContactDistanceThreshold(double cs)
             {
                 contact_distance_ = cs;
-                collision_manager_->setContactDistanceThreshold(0.5 * cs);
+                //collision_manager_->setContactDistanceThreshold(0.5 * cs);
             }
 
             double getContactDistanceThreshold() const 

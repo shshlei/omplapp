@@ -27,7 +27,7 @@
 #include <ompl/geometric/planners/kpiece/LBKPIECE1.h>
 #include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
-#include <ompl/geometric/planners/hsc/BiHSCCell.h>
+//#include <ompl/geometric/planners/hsc/BiHSCCell.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
 
 // optimal planners
@@ -44,7 +44,7 @@
 #include <ompl/geometric/planners/bispace/RRTBispacestar.h>
 #include <ompl/geometric/planners/ase/BiASEstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCstar.h>
-#include <ompl/geometric/planners/hsc/BiHSCCellstar.h>
+//#include <ompl/geometric/planners/hsc/BiHSCCellstar.h>
 //#include <ompl/geometric/planners/hsc/HSCASEstar.h>
 
 #include <boost/filesystem.hpp>
@@ -212,22 +212,15 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
-            if (params.hasParam(std::string("pen_distance")))
-                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
-
             return planner;
             break;
         }
         case PLANNER_CELLBISPACESTAR:
         {
             auto planner = std::make_shared<og::CellBispacestar>(si);
-            planner->setAddIntermediateState(false);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
-            if (params.hasParam(std::string("pen_distance")))
-                params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
-
             return planner;
             break;
         }
@@ -308,6 +301,7 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
+        /*
         case PLANNER_BIHSCCELL:
         {
             auto planner = std::make_shared<og::BiHSCCell>(si);
@@ -336,7 +330,6 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
-        /*
         case PLANNER_HSCASE:
         {
             auto planner = std::make_shared<og::HSCASE>(si);

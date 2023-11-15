@@ -1,3 +1,6 @@
+find_package(HDF5 REQUIRED COMPONENTS CXX HL)
+include_directories(${HDF5_INCLUDE_DIRS})
+
 set(OMPL_BUILD_DEMOS ON)
 if (OMPL_BUILD_DEMOS)
     set(OMPLAPP_DEMO_LIBRARIES ${OMPLAPP_LIBRARIES} ompl ompl_app_base)
@@ -28,11 +31,12 @@ if (OMPL_BUILD_DEMOS)
     add_omplapp_demo(demo_box_box BulletTest/box_box.cpp)
     add_omplapp_demo(demo_RandomScenarioCreation RandomPolygonCircles/RandomScenarioCreation.cpp)
     add_omplapp_demo(demo_RandomScenarioRead RandomPolygonCircles/RandomScenarioRead.cpp)
+    add_omplapp_demo(demo_DistanceCalculation RandomPolygonCircles/DistanceCalculation.cpp)
 
     add_omplapp_demo(demo_Exam MessTest/Exam.cpp)
     add_omplapp_demo(demo_TestBinaryHeap MessTest/TestBinaryHeap.cpp)
     add_omplapp_demo(demo_TestGrid MessTest/TestGrid.cpp)
-    add_omplapp_demo(demo_TestDiscretization MessTest/TestDiscretization.cpp)
+    #add_omplapp_demo(demo_TestDiscretization MessTest/TestDiscretization.cpp)
     add_omplapp_demo(demo_TestVectorErase MessTest/TestVectorErase.cpp)
     add_omplapp_demo(demo_TestGraphRemoveNodeVSClearAdd MessTest/TestGraphRemoveNodeVSClearAdd.cpp)
 
@@ -40,6 +44,7 @@ if (OMPL_BUILD_DEMOS)
         SimpleConfigurationCertificate/SimpleConfigurationCertificate.cpp
         SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.h
         SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.cpp
+        SimpleConfigurationCertificate/CSCRRT.h
         SimpleConfigurationCertificate/CSCRRT.h
         SimpleConfigurationCertificate/CSCRRT.cpp
         SimpleConfigurationCertificate/CSCRRTstar.h
@@ -58,9 +63,11 @@ if (OMPL_BUILD_DEMOS)
         SimpleConfigurationCertificate/CSCRRTConnect.h
         SimpleConfigurationCertificate/CSCRRTConnect.cpp)
 
-    add_omplapp_demo(demo_RandomPolygonCircles RandomPolygonCircles/RandomPolygonCirclesPlanning.cpp)
+    add_omplapp_demo(demo_RandomPolygonCircles RandomPolygonCircles/RandomPolygonCirclesPlanning.cpp RandomPolygonCircles/NaiveConnect.h RandomPolygonCircles/NaiveConnect.cpp)
     add_omplapp_demo(demo_RandomPolygonCirclesBenchmark RandomPolygonCircles/RandomPolygonCirclesBenchmark.cpp)
     add_omplapp_demo(demo_RealVector2RigidBodyPlanning RealVector2RigidBodyPlanning/RealVector2RigidBodyPlanning.cpp)
+    add_omplapp_demo(demo_NarrowPassages RealVector2RigidBodyPlanning/NarrowPassages.cpp)
+    add_omplapp_demo(demo_NarrowPassagesBenchmark RealVector2RigidBodyPlanning/NarrowPassagesBenchmark.cpp)
 
     add_omplapp_demo(demo_MaxDistance SE2MaxDistance.cpp)
     add_omplapp_demo(demo_Box2dSafetyCertificateChecker Box2dSafetyCertificateChecker.cpp)  
@@ -75,6 +82,21 @@ if (OMPL_BUILD_DEMOS)
     add_omplapp_demo(demo_MSE3RigidBodyPlanning SE3RigidBodyPlanning/MSE3RigidBodyPlanning.cpp)
     add_omplapp_demo(demo_MSE3Benchmark SE3RigidBodyPlanning/MSE3Benchmark.cpp)
     add_omplapp_demo(demo_MSE3RRTBenchmark SE3RigidBodyPlanning/MSE3RRTBenchmark.cpp)
+
+    add_omplapp_demo(demo_CollisionDataCreationPoint DeepCollision/CollisionDataCreationPoint.cpp)
+    add_omplapp_demo(demo_CollisionDataCreationShape DeepCollision/CollisionDataCreationShape.cpp)
+
+    add_executable(demo_CollisionDataCreationHybridShape DeepCollision/CollisionDataCreationHybridShape.cpp)
+    target_link_libraries(demo_CollisionDataCreationHybridShape ${OMPLAPP_DEMO_LIBRARIES}
+        ${Boost_FILESYSTEM_LIBRARY}
+        ${Boost_SYSTEM_LIBRARY}
+        ${Boost_PROGRAM_OPTIONS_LIBRARY} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES})
+
+    add_executable(demo_CollisionDataCreationHybridHybridShape DeepCollision/CollisionDataCreationHybridHybridShape.cpp)
+    target_link_libraries(demo_CollisionDataCreationHybridHybridShape ${OMPLAPP_DEMO_LIBRARIES}
+        ${Boost_FILESYSTEM_LIBRARY}
+        ${Boost_SYSTEM_LIBRARY}
+        ${Boost_PROGRAM_OPTIONS_LIBRARY} ${HDF5_CXX_LIBRARIES} ${HDF5_LIBRARIES})
 
     # create executable for planning with OPENDE
     if (ODE_FOUND AND DRAWSTUFF_FOUND AND GLUT_INCLUDE_DIR AND GLUT_LIBRARIES)

@@ -79,18 +79,17 @@ bool readHeader(std::istream& s, int& numbers)
             s >> numbers;
         else
         {
-            OMPL_WARN("Unknown keyword in Random Polygons and Circles header, skipping: %s", token);
+            OMPL_WARN("Unknown keyword in Random 2D Scenarios header, skipping: %s", token);
             char c;
             do {
                 c = s.get();
             } while(s.good() && (c != '\n'));
-
         }
     }
 
     if (!headerRead)
     {
-        OMPL_ERROR("Error reading Random Polygons and Circles header!");
+        OMPL_ERROR("Error reading Random 2D Scenarios header!");
         return false;
     }
 
@@ -99,7 +98,7 @@ bool readHeader(std::istream& s, int& numbers)
 
 bool read(b2BVHManager &manager, std::istream &s)
 {
-    const std::string& fileHeader = "# Random polygons and circles file";
+    const std::string& fileHeader = "# Random 2D scenarios with circle, polygon, ellipse, capsule and rectangle shapes";
 
     // check if first line valid:
     std::string line;
@@ -110,6 +109,7 @@ bool read(b2BVHManager &manager, std::istream &s)
         return false;
     }
 
+    // read shape numbers
     int numbers = 0;
     if (!readHeader(s, numbers))
         return false;
@@ -117,41 +117,69 @@ bool read(b2BVHManager &manager, std::istream &s)
     int shapec = 0;
     int type = 0;
     int count = 0;
-    double x = 0.0, y = 0.0, r = 0.0;
+    double x = 0.0, y = 0.0, yaw = 0.0, r = 0.0, h = 0.0, a = 0.0, b = 0.0;
     while (s.good())
     {
         s >> type;
         if (!s.good())
             break;
         b2Shape *shape = nullptr;
-        if (type == 0)
+        b2Transform xf = b2Transform::Identity();
+        bool polygon = false;
+        if (type == 0) // circle
         {
             s >> x >> y >> r;
-            b2CircleShape *cshape = new b2CircleShape();
-            cshape->SetRadius(b2Scalar(r));
-            cshape->m_p.Set(b2Scalar(x), b2Scalar(y));
+            yaw = 0.0;
+            b2CircleShape *cshape = new b2CircleShape(b2Scalar(r));
+            xf.translation() = b2Vec2(b2Scalar(x), b2Scalar(y));
             shape = cshape;
         }
-        else if (type == 1) 
+        else if (type == 1) // polygon 
         {
+            polygon = true;
             s >> count; 
             b2Vec2 vecs[count];
             for (int i = 0; i < count; i++)
             {
                 s >> x >> y;
-                vecs[i].Set(b2Scalar(x), b2Scalar(y));
+                vecs[i] = b2Vec2(b2Scalar(x), b2Scalar(y));
             }
 
             b2PolygonShape *pshape = new b2PolygonShape();
-            pshape->SetRadius(b2Scalar(0.0));
             pshape->Set(vecs, count);
             shape = pshape;
+        }
+        else if (type == 2) // ellipse
+        {
+            s >> x >> y >> yaw >> a >> b;
+            b2EllipseShape *eshape = new b2EllipseShape(b2Scalar(a), b2Scalar(b));
+            xf.translation() = b2Vec2(b2Scalar(x), b2Scalar(y));
+            xf.linear() = b2Rot(b2Scalar(yaw)).toRotationMatrix();
+            shape = eshape;
+        }
+        else if (type == 3) // capsule 
+        {
+            s >> x >> y >> yaw >> r >> h;
+            b2CapsuleShape *cshape = new b2CapsuleShape(b2Scalar(r), b2Scalar(h));
+            xf.translation() = b2Vec2(b2Scalar(x), b2Scalar(y));
+            xf.linear() = b2Rot(b2Scalar(yaw)).toRotationMatrix();
+            shape = cshape;
+        }
+        else if (type == 4) // rectangle 
+        {
+            s >> x >> y >> yaw >> a >> b;
+            b2RectangleShape *rectshape = new b2RectangleShape(b2Scalar(a), b2Scalar(b));
+            xf.translation() = b2Vec2(b2Scalar(x), b2Scalar(y));
+            xf.linear() = b2Rot(b2Scalar(yaw)).toRotationMatrix();
+            shape = rectshape;
         }
 
         if (shape != nullptr)
         {
             shapec++;
-            manager.AddBody("shape" + std::to_string(shapec), shape, false);
+            manager.AddBody("shape" + std::to_string(shapec), shape, b2Transform::Identity(), false);
+            if (!polygon)
+                manager.SetBodyTransform("shape" + std::to_string(shapec), xf);
             delete shape;
         }
     }
@@ -198,11 +226,10 @@ int main(int argc, char* argv[])
     double x[3] = {0.0086579571682871, -0.02506512753291945, 0.012808997914287135};
     double y[3] = {0.028723505664735693, 0.01648451945791818, -0.027128021904145316};
     for (int i = 0; i < count; i++)
-        vecs[i].Set(b2Scalar(x[i]), b2Scalar(y[i]));
+        vecs[i] = b2Vec2(b2Scalar(x[i]), b2Scalar(y[i]));
     b2PolygonShape *pshape = new b2PolygonShape();
-    pshape->SetRadius(b2Scalar(0.0));
     pshape->Set(vecs, count);
-    manager.AddBody("robot", pshape, true);
+    manager.AddBody("robot", pshape, b2Transform::Identity(), true);
 
     if (collision_status)
     {
@@ -213,9 +240,10 @@ int main(int argc, char* argv[])
             for (int j = 0; j < 1001; j++)
             {
                 double xx = 0.001 * j;
-                b2Transform xf(b2Vec2(b2Scalar(xx), b2Scalar(yy)), b2Scalar(0.0));
+                b2Transform xf = b2Transform::Identity();
+                xf.translation() = b2Vec2(b2Scalar(xx), b2Scalar(yy));
                 manager.SetBodyTransform("robot", xf);
-                bool collision = manager.ContactTest();
+                bool collision = manager.Collide();
                 ofs << collision << " ";
             }
             ofs << std::endl;
@@ -233,21 +261,22 @@ int main(int argc, char* argv[])
             double xc = rng.uniform01();
             double yc = rng.uniform01();
 
-            b2Transform xf(b2Vec2(b2Scalar(xc), b2Scalar(yc)), b2Scalar(0.0));
+            b2Transform xf = b2Transform::Identity();
+            xf.translation() = b2Vec2(b2Scalar(xc), b2Scalar(yc));
             manager.SetBodyTransform("robot", xf);
             b2ContactResult contacts;
             b2InscribedSpheres inscribedSpheres;
-            if (manager.ContactTest(&contacts, &inscribedSpheres))
+            if (manager.Collide(&contacts, &inscribedSpheres))
             {
                 ofs << xc << " " << yc << " ";
                 b2Vec2 p1 = contacts.points[0];
                 b2Vec2 p2 = contacts.points[1];
-                ofs << p1.x << " " << p1.y << " " << p2.x << " " << p2.y << " ";
+                ofs << p1.x() << " " << p1.y() << " " << p2.x() << " " << p2.y() << " ";
                 ofs << std::endl;
                 if (inscribedSpheres.has_sphere1)
-                    ofss << inscribedSpheres.center1.x << " " << inscribedSpheres.center1.y << " " << inscribedSpheres.radius1 << " ";
+                    ofss << inscribedSpheres.center1.x() << " " << inscribedSpheres.center1.y() << " " << inscribedSpheres.radius1 << " ";
                 if (inscribedSpheres.has_sphere2)
-                    ofss << inscribedSpheres.center2.x << " " << inscribedSpheres.center2.y << " " << inscribedSpheres.radius2 << " ";
+                    ofss << inscribedSpheres.center2.x() << " " << inscribedSpheres.center2.y() << " " << inscribedSpheres.radius2 << " ";
                 ofss << std::endl;
             }
         }
@@ -267,10 +296,11 @@ int main(int argc, char* argv[])
             double yc = rng.uniform01();
             if (xc < 0.05 || xc > 0.95 || yc < 0.05 || yc > 0.95)
                 continue;
-            b2Transform xf(b2Vec2(b2Scalar(xc), b2Scalar(yc)), b2Scalar(0.0));
+            b2Transform xf = b2Transform::Identity();
+            xf.translation() = b2Vec2(b2Scalar(xc), b2Scalar(yc));
             manager.SetBodyTransform("robot", xf);
             b2ContactResult contacts;
-            bool collision = manager.ContactTest(&contacts);
+            bool collision = manager.Collide(&contacts);
             if (collision)
             {
                 bool sc = false;
@@ -297,19 +327,19 @@ int main(int argc, char* argv[])
                     while (rmax - rmin > 1.e-2) // minimum translation
                     {
                         rmiddle = (rmin + rmax) / 2.0;
-                        xf.Set(b2Vec2(b2Scalar(xc + rmiddle), b2Scalar(yc)), b2Scalar(0.0));
+                        xf.translation() = b2Vec2(b2Scalar(xc + rmiddle), b2Scalar(yc));
                         manager.SetBodyTransform("robot", xf);
-                        if (manager.ContactTest())
+                        if (manager.Collide())
                             rmin = rmiddle;
                         else 
                             rmax = rmiddle;
                     }
 
                     manager.EnableAll();
-                    xf.Set(b2Vec2(b2Scalar(xc + rmax), b2Scalar(yc)), b2Scalar(0.0));
+                    xf.translation() = b2Vec2(b2Scalar(xc + rmax), b2Scalar(yc));
                     manager.SetBodyTransform("robot", xf);
                     b2ContactResult contact;
-                    if (manager.ContactTest(&contact)) // another contact
+                    if (manager.Collide(&contact)) // another contact
                     {
                         manager.DisableAll();
                         manager.EnableBody(contact.names[0]);
@@ -333,19 +363,19 @@ int main(int argc, char* argv[])
                     while (rmax - rmin > 1.e-2) // minimum translation
                     {
                         rmiddle = (rmin + rmax) / 2.0;
-                        xf.Set(b2Vec2(b2Scalar(xc - rmiddle), b2Scalar(yc)), b2Scalar(0.0));
+                        xf.translation() = b2Vec2(b2Scalar(xc - rmiddle), b2Scalar(yc));
                         manager.SetBodyTransform("robot", xf);
-                        if (manager.ContactTest())
+                        if (manager.Collide())
                             rmin = rmiddle;
                         else 
                             rmax = rmiddle;
                     }
 
                     manager.EnableAll();
-                    xf.Set(b2Vec2(b2Scalar(xc - rmax), b2Scalar(yc)), b2Scalar(0.0));
+                    xf.translation() = b2Vec2(b2Scalar(xc - rmax), b2Scalar(yc));
                     manager.SetBodyTransform("robot", xf);
                     b2ContactResult contact;
-                    if (manager.ContactTest(&contact)) // another contact
+                    if (manager.Collide(&contact)) // another contact
                     {
                         manager.DisableAll();
                         manager.EnableBody(contact.names[0]);
@@ -369,19 +399,19 @@ int main(int argc, char* argv[])
                     while (rmax - rmin > 1.e-2) // minimum translation
                     {
                         rmiddle = (rmin + rmax) / 2.0;
-                        xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc + rmiddle)), b2Scalar(0.0));
+                        xf.translation() = b2Vec2(b2Scalar(xc), b2Scalar(yc + rmiddle));
                         manager.SetBodyTransform("robot", xf);
-                        if (manager.ContactTest())
+                        if (manager.Collide())
                             rmin = rmiddle;
                         else 
                             rmax = rmiddle;
                     }
 
                     manager.EnableAll();
-                    xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc + rmax)), b2Scalar(0.0));
+                    xf.translation() = b2Vec2(b2Scalar(xc), b2Scalar(yc + rmax));
                     manager.SetBodyTransform("robot", xf);
                     b2ContactResult contact;
-                    if (manager.ContactTest(&contact)) // another contact
+                    if (manager.Collide(&contact)) // another contact
                     {
                         manager.DisableAll();
                         manager.EnableBody(contact.names[0]);
@@ -405,19 +435,19 @@ int main(int argc, char* argv[])
                     while (rmax - rmin > 1.e-2) // minimum translation
                     {
                         rmiddle = (rmin + rmax) / 2.0;
-                        xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc - rmiddle)), b2Scalar(0.0));
+                        xf.translation() = b2Vec2(b2Scalar(xc), b2Scalar(yc - rmiddle));
                         manager.SetBodyTransform("robot", xf);
-                        if (manager.ContactTest())
+                        if (manager.Collide())
                             rmin = rmiddle;
                         else 
                             rmax = rmiddle;
                     }
 
                     manager.EnableAll();
-                    xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc - rmax)), b2Scalar(0.0));
+                    xf.translation() = b2Vec2(b2Scalar(xc), b2Scalar(yc - rmax));
                     manager.SetBodyTransform("robot", xf);
                     b2ContactResult contact;
-                    if (manager.ContactTest(&contact)) // another contact
+                    if (manager.Collide(&contact)) // another contact
                     {
                         manager.DisableAll();
                         manager.EnableBody(contact.names[0]);
@@ -447,6 +477,7 @@ int main(int argc, char* argv[])
         ofs1.close();
     }
 
+    /*
     if (safe_points)
     {
         ompl::RNG rng;
@@ -458,9 +489,10 @@ int main(int argc, char* argv[])
             double xc = rng.uniform01();
             double yc = rng.uniform01();
 
-            b2Transform xf(b2Vec2(b2Scalar(xc), b2Scalar(yc)), b2Scalar(0.0));
+            b2Transform xf = b2Transform::Identity();
+            xf.translation() = b2Vec2(b2Scalar(xc), b2Scalar(yc));
             manager.SetBodyTransform("robot", xf);
-            bool collision = manager.ContactTest();
+            bool collision = manager.Collide();
             if (!collision)
             {
                 bool sc = false;
@@ -482,7 +514,7 @@ int main(int argc, char* argv[])
                     pshape->SetRadius(b2Scalar(rmiddle));
                     manager.AddBody("robot", pshape, true);
                     manager.SetBodyTransform("robot", xf);
-                    if (manager.ContactTest())
+                    if (manager.Collide())
                         rmax = rmiddle;
                     else 
                         rmin = rmiddle;
@@ -504,22 +536,27 @@ int main(int argc, char* argv[])
         }
         ofs2.close();
     }
+    */
 
     if (compare)
     {
         int robotC = 15;
-        manager.RemoveBody("robot");
+        manager.RemoveBody("robot"); // self collision
         for (int i = 0; i < robotC; i++)
-            manager.AddBody("robot" + std::to_string(i), pshape, true);
+            manager.AddBody("robot" + std::to_string(i), pshape, b2Transform::Identity(), true);
 
-        b2BVHManager manager2;
+        b2BVHManager manager2; // static obstacles
         read(manager2, std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
 
-        b2BVHManager manager3;
+        b2BVHManager manager3; // moving robots 
         for (int i = 0; i < robotC; i++)
-            manager3.AddBody("robot" + std::to_string(i), pshape, true);
+            manager3.AddBody("robot" + std::to_string(i), pshape, b2Transform::Identity(), true);
 
         ompl::RNG rng;
+
+        rng.setLocalSeed(74459601);
+        OMPL_INFORM("rng seed %u", rng.getLocalSeed());
+
         int iter = 0, count = 1.e4;
         double time1 = 0.0, time2 = 0.0, time3 = 0.0;
         double pi = boost::math::constants::pi<double>();
@@ -531,8 +568,9 @@ int main(int argc, char* argv[])
                 double yc = rng.uniform01();
                 double yaw= rng.uniformReal(-pi, pi);
 
-                b2Transform xf;
-                xf.Set(b2Vec2(b2Scalar(xc), b2Scalar(yc)), b2Scalar(yaw));
+                b2Transform xf = b2Transform::Identity();
+                xf.translation() = b2Vec2(b2Scalar(xc), b2Scalar(yc));
+                xf.linear() = b2Rot(b2Scalar(yaw)).toRotationMatrix();
 
                 time::point start = time::now();
                 manager.SetBodyTransform("robot" + std::to_string(i), xf);
@@ -545,15 +583,15 @@ int main(int argc, char* argv[])
             }
 
             time::point start = time::now();
-            bool collision1 = manager.ContactTest();
+            bool collision1 = manager.Collide();
             time1 += time::seconds(time::now() - start);
 
             start = time::now();
-            bool collision2 = manager3.ContactTest(&manager2);
+            bool collision2 = manager3.Collide(&manager2);
             time2 += time::seconds(time::now() - start);
 
             start = time::now();
-            bool collision3 = manager2.ContactTest(&manager3);
+            bool collision3 = manager2.Collide(&manager3);
             time3 += time::seconds(time::now() - start);
 
             if (collision1 != collision2)

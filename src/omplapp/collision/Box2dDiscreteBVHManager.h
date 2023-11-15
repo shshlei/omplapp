@@ -54,64 +54,49 @@ namespace ompl
             {
                 inline b2Vec2 convertEigenToBox2d(const Eigen::Vector2d& v)
                 {
-                    return b2Vec2(static_cast<b2Scalar>(v[0]), static_cast<b2Scalar>(v[1]));
+                    return v;
                 }
 
                 inline Eigen::Vector2d convertBox2dToEigen(const b2Vec2& v)
                 {
-                    return Eigen::Vector2d{static_cast<double>(v.x), static_cast<double>(v.y)};
+                    return v;
                 }
 
                 inline b2Mat22 convertEigenToBox2d(const Eigen::Matrix2d& r)
                 {
-                    return b2Mat22(static_cast<b2Scalar>(r(0, 0)), static_cast<b2Scalar>(r(0, 1)),
-                                   static_cast<b2Scalar>(r(1, 0)), static_cast<b2Scalar>(r(1, 1)) );
+                    return r;
                 }
 
                 inline Eigen::Matrix2d convertBox2dToEigen(const b2Mat22& r)
                 {
-                    Eigen::Matrix2d m;
-                    m << static_cast<double>(r.ex.x), static_cast<double>(r.ey.x),
-                         static_cast<double>(r.ex.y), static_cast<double>(r.ey.y);
-                    return m;
+                    return r;
                 }
 
                 inline b2Mat33 convertEigenToBox2d(const Eigen::Matrix3d& r)
                 {
-                    return b2Mat33(static_cast<b2Scalar>(r(0, 0)), static_cast<b2Scalar>(r(0, 1)), static_cast<b2Scalar>(r(0, 2)),
-                                   static_cast<b2Scalar>(r(1, 0)), static_cast<b2Scalar>(r(1, 1)), static_cast<b2Scalar>(r(1, 2)),
-                                   static_cast<b2Scalar>(r(2, 0)), static_cast<b2Scalar>(r(2, 1)), static_cast<b2Scalar>(r(2, 2)) );
+                    return r;
                 }
 
                 inline Eigen::Matrix3d convertBox2dToEigen(const b2Mat33& r)
                 {
-                    Eigen::Matrix3d m;
-                    m << static_cast<double>(r.ex.x), static_cast<double>(r.ey.x), static_cast<double>(r.ez.x),
-                         static_cast<double>(r.ex.y), static_cast<double>(r.ey.y), static_cast<double>(r.ez.y),
-                         static_cast<double>(r.ex.z), static_cast<double>(r.ey.z), static_cast<double>(r.ez.z);
-                    return m;
+                    return r;
                 }
 
                 inline b2Transform convertEigenToBox2d(const Eigen::Isometry2d& t)
                 {
-                    double rot = Eigen::Rotation2Dd(t.linear()).angle();
-                    const Eigen::Vector2d& tran = t.translation();
-                    return b2Transform(convertEigenToBox2d(tran), static_cast<b2Scalar>(rot));
+                    return t;
                 }
 
                 inline Eigen::Isometry2d convertBox2dToEigen(const b2Transform& t)
                 {
-                    Eigen::Isometry2d i = Eigen::Isometry2d::Identity();
-                    i.rotate(static_cast<double>(t.q.GetAngle()));
-                    i.translation() = convertBox2dToEigen(t.p);
-                    return i;
+                    return t;
                 }
 
                 inline Eigen::Isometry3d convertBox2dToEigen3(const b2Transform& t)
                 {
                     Eigen::Isometry3d i = Eigen::Isometry3d::Identity();
-                    i.rotate(Eigen::AngleAxisd(static_cast<double>(t.q.GetAngle()), Eigen::Vector3d(0, 0, 1)).matrix());
-                    i.translation().head<2>() = convertBox2dToEigen(t.p);
+                    i.linear().topLeftCorner(2, 2) = t.linear();
+                    i.translation().head<2>() = t.translation();
                     return i;
                 }
 
@@ -241,7 +226,7 @@ namespace ompl
                     virtual bool pointTest(const Eigen::Vector2d& point);
                     virtual bool contactTest(base::ContactResult& collisions);
 
-                    virtual double distanceTest();
+                    virtual double distanceTest(double &dist);
                     //virtual double distanceTest(base::ContactResult& collisions);
 
                     std::unique_ptr<b2BVHManager>& getBox2dBroadphse()
@@ -251,39 +236,25 @@ namespace ompl
 
                 private:
 
-                    class PointQueryCallback : public b2QueryCallback
+                    class PointQueryCallback : public b2NaiveCallback
                     {
                     public:
-                        PointQueryCallback(const b2Vec2& point) : b2QueryCallback()
+                        PointQueryCallback(const b2Vec2& point) : b2NaiveCallback()
                         {
                             point_ = point;
-                            xf_.SetIdentity();
-                            collision_ = false;
                         }
 
                         ~PointQueryCallback() override = default;
 
-                        /// Called for each fixture found in the query AABB.
-                        /// @return false to terminate the query.
-                        bool ReportFixture(b2Fixture* fixture) override
+                        bool ReportCollision(b2Fixture* fixture) override
                         {
-                            if (fixture->GetShape()->TestPoint(xf_, point_))
-                            {
-                                collision_ = true;
-                                return false;
-                            }
-                            return true;
-                        }
-
-                        bool isCollision() const 
-                        {
-                            return collision_;
+                            if (fixture->GetShape()->TestPoint(fixture->GetGlobalTransform(), point_))
+                                return true;
+                            return false;
                         }
 
                     private:
                         b2Vec2 point_;
-                        b2Transform xf_;
-                        bool collision_; 
                     };
 
                     std::vector<std::string> active_; 

@@ -49,8 +49,9 @@ namespace ompl
             enum GeometryType
             {
                 CIRCLE,
+                ELLIPSE,
+                RECTANGLE,
                 POLYGON,
-                POLYGONSET,
                 SPHERE,
                 CYLINDER,
                 CAPSULE,
@@ -118,6 +119,40 @@ namespace ompl
 
             private:
                 double r_;
+            };
+
+            class Ellipse : public Geometry
+            {
+            public:
+                explicit Ellipse(double a, double b) : Geometry(GeometryType::ELLIPSE), a_(a), b_(b) {}
+
+                ~Ellipse() override = default;
+
+                double getA() const { return a_; }
+
+                double getB() const { return b_; }
+
+                GeometryPtr clone() const override { return std::make_shared<Ellipse>(a_, b_); }
+
+            private:
+                double a_, b_;
+            };
+
+            class Rectangle : public Geometry
+            {
+            public:
+                explicit Rectangle(double a, double b) : Geometry(GeometryType::RECTANGLE), a_(a), b_(b) {}
+
+                ~Rectangle() override = default;
+
+                double getA() const { return a_; }
+
+                double getB() const { return b_; }
+
+                GeometryPtr clone() const override { return std::make_shared<Rectangle>(a_, b_); }
+
+            private:
+                double a_, b_;
             };
 
             class Polygon : public Geometry
@@ -215,37 +250,6 @@ namespace ompl
             private:
                 Eigen::Vector2d vertices_[8];
                 int count_;
-            };
-
-            class PolygonSet : public Geometry
-            {
-            public:
-                PolygonSet(const std::vector<Polygon> polygons)
-                : Geometry(GeometryType::POLYGONSET)
-                , polygons_(polygons)
-                {
-                }
-
-                ~PolygonSet() override = default;
-
-                GeometryPtr clone() const override
-                {
-                    return std::make_shared<PolygonSet>(polygons_);
-                }
-
-                const std::vector<Polygon>& getPolygons() const 
-                {
-                    return polygons_;
-                }
-
-                int getPolygonCount() const 
-                {
-                    return static_cast<int>(polygons_.size());
-                }
-
-            private:
-
-                const std::vector<Polygon> polygons_;
             };
 
             class Sphere : public Geometry

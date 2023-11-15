@@ -51,6 +51,28 @@ namespace ompl
                     return shape;
                 }
 
+                b2Shape* createShapePrimitive(const geometries::Ellipse& geom)
+                {
+                    b2EllipseShape* shape = new b2EllipseShape();
+                    shape->SetHalfSides(static_cast<b2Scalar>(geom.getA()), static_cast<b2Scalar>(geom.getB()));
+                    return shape;
+                }
+
+                b2Shape* createShapePrimitive(const geometries::Rectangle& geom)
+                {
+                    b2RectangleShape* shape = new b2RectangleShape();
+                    shape->Set(static_cast<b2Scalar>(geom.getA()), static_cast<b2Scalar>(geom.getB()));
+                    return shape;
+                }
+
+                b2Shape* createShapePrimitive(const geometries::Capsule& geom)
+                {
+                    b2CapsuleShape* shape = new b2CapsuleShape();
+                    shape->SetRadius(static_cast<b2Scalar>(geom.getRadius()));
+                    shape->SetHeight(static_cast<b2Scalar>(0.5 * geom.getLength()));
+                    return shape;
+                }
+
                 b2Shape* createShapePrimitive(const geometries::Polygon& geom)
                 {
                     b2PolygonShape* shape = new b2PolygonShape();
@@ -78,6 +100,24 @@ namespace ompl
                         case geometries::GeometryType::CIRCLE:
                         {
                             auto geom = geo->as<geometries::Circle>();
+                            shape = createShapePrimitive(*geom);
+                            break;
+                        }
+                        case geometries::GeometryType::ELLIPSE:
+                        {
+                            auto geom = geo->as<geometries::Ellipse>();
+                            shape = createShapePrimitive(*geom);
+                            break;
+                        }
+                        case geometries::GeometryType::CAPSULE:
+                        {
+                            auto geom = geo->as<geometries::Capsule>();
+                            shape = createShapePrimitive(*geom);
+                            break;
+                        }
+                        case geometries::GeometryType::RECTANGLE:
+                        {
+                            auto geom = geo->as<geometries::Rectangle>();
                             shape = createShapePrimitive(*geom);
                             break;
                         }
@@ -119,7 +159,7 @@ namespace ompl
                         const b2Fixture *f = bodylist->GetFixtureList();
                         while (f)
                         {
-                            clone_broadphase->AddShapeToBody(body, f->GetShape());
+                            clone_broadphase->AddShapeToBody(body, f->GetShape(), f->GetLocalTransform());
                             body->GetFixtureList()->SetFilterData(f->GetFilterData());
                             body->GetFixtureList()->SetUserData(f->GetUserData());
                             f = f->GetNext();
@@ -149,8 +189,7 @@ namespace ompl
                             if (body == nullptr)
                                 body = broadphase_->CreateBody(name, active);
                             b2Transform xf = convertEigenToBox2d(shape_poses[index]);
-                            shape->SetLocalTransform(xf);
-                            broadphase_->AddShapeToBody(body, shape, index);
+                            broadphase_->AddShapeToBody(body, shape, xf, index);
                             delete shape;
                         }
                         index++;
@@ -217,15 +256,14 @@ namespace ompl
 
                 bool Box2dDiscreteBVHManager::contactTest()
                 {
-                    return broadphase_->ContactTest();
+                    return broadphase_->Collide();
                 }
 
                 bool Box2dDiscreteBVHManager::pointTest(const Eigen::Vector2d& point)
                 {
                     b2Vec2 bpoint = convertEigenToBox2d(point);
                     PointQueryCallback callback(bpoint);
-                    broadphase_->QueryPoint(&callback, bpoint);
-                    return callback.isCollision();
+                    return broadphase_->Collide(&callback, bpoint);
                 }
 
                 bool Box2dDiscreteBVHManager::contactTest(base::ContactResult& collisions)
@@ -233,7 +271,7 @@ namespace ompl
                     b2ContactResult contact;
                     b2InscribedSpheres inscribedSpheres;
                     collisions.clear();
-                    if (broadphase_->ContactTest(&contact, &inscribedSpheres))
+                    if (broadphase_->Collide(&contact, &inscribedSpheres))
                     {
                         collisions.type_id[0] = 1;
                         collisions.type_id[1] = 1;
@@ -299,9 +337,9 @@ namespace ompl
                     return false;
                 }
 
-                double Box2dDiscreteBVHManager::distanceTest()
+                double Box2dDiscreteBVHManager::distanceTest(double &dist)
                 {
-                    return broadphase_->DistanceTest();
+                    return broadphase_->Distance(dist);
                 }
             }
         }

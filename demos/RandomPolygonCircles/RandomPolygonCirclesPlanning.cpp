@@ -46,10 +46,12 @@
 #include <ompl/base/spaces/ReedsSheppStateSpace.h>
 
 // feasible planners
+#include "NaiveConnect.h"
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 #include <ompl/geometric/planners/rrt/RRT.h>
 #include <ompl/geometric/planners/sbl/SBL.h>
 #include <ompl/geometric/planners/bispace/RRTBispace.h>
+#include <ompl/geometric/planners/bispace/CellBispace.h>
 #include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
@@ -63,8 +65,10 @@
 #include <ompl/geometric/planners/prm/PRMstar.h>
 #include <ompl/geometric/planners/rrt/InformedRRTstar.h>
 #include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/geometric/planners/rrt/BiRRTstar.h>
 #include <ompl/geometric/planners/rrt/SORRTstar.h>
 #include <ompl/geometric/planners/bispace/RRTBispacestar.h>
+#include <ompl/geometric/planners/bispace/CellBispacestar.h>
 #include <ompl/geometric/planners/ase/BiASEstar.h>
 #include <ompl/geometric/planners/hsc/BiHSCstar.h>
 //#include <ompl/geometric/planners/hsc/HSCASEstar.h>
@@ -92,6 +96,7 @@ enum PlannerType
     PLANNER_INF_RRTSTAR,
     PLANNER_PRMSTAR,
     PLANNER_RRTSTAR,
+    PLANNER_BIRRTSTAR,
     PLANNER_SORRTSTAR,
     PLANNER_BIASE,
     PLANNER_BIASESTAR,
@@ -102,7 +107,10 @@ enum PlannerType
     PLANNER_RRT,
     PLANNER_RRTBISPACE,
     PLANNER_RRTBISPACESTAR,
+    PLANNER_CELLBISPACE,
+    PLANNER_CELLBISPACESTAR,
     PLANNER_RRTCONNECT,
+    PLANNER_NAIVECONNECT,
     PLANNER_SBL,
 };
 
@@ -185,6 +193,18 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
+        case PLANNER_BIRRTSTAR:
+        {
+            auto planner = std::make_shared<og::BiRRTstar>(si);
+            ompl::base::ParamSet& params = planner->params();
+            if (params.hasParam(std::string("range")))
+                params.setParam(std::string("range"), ompl::toString(range));
+            if (params.hasParam(std::string("collision_range")))
+                params.setParam(std::string("collision_range"), ompl::toString(range));
+
+            return planner;
+            break;
+        }
         case PLANNER_SORRTSTAR:
         {
             auto planner = std::make_shared<og::SORRTstar>(si);
@@ -208,12 +228,12 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
         case PLANNER_RRTBISPACE:
         {
             auto planner = std::make_shared<og::RRTBispace>(si);
-            planner->setLazyPath(true);
-            planner->setLazyNode(true);
+            planner->setLazyPath(false);
+            planner->setLazyNode(false);
             planner->setUseBispace(true);
-            planner->setRewire(true);
-            planner->setRewireSort(true);
-            planner->setAddIntermediateState(true);
+            //planner->setRewire(true);
+            //planner->setRewireSort(true);
+            //planner->setAddIntermediateState(true);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
@@ -224,16 +244,33 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
         case PLANNER_RRTBISPACESTAR:
         {
             auto planner = std::make_shared<og::RRTBispacestar>(si);
-            planner->setLazyPath(true);
-            planner->setLazyNode(true);
+            planner->setLazyPath(false);
+            planner->setLazyNode(false);
             planner->setUseBispace(true);
-            planner->setAddIntermediateState(true);
             ompl::base::ParamSet& params = planner->params();
             if (params.hasParam(std::string("range")))
                 params.setParam(std::string("range"), ompl::toString(range));
             if (params.hasParam(std::string("pen_distance")))
                 params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
 
+            return planner;
+            break;
+        }
+        case PLANNER_CELLBISPACE:
+        {
+            auto planner = std::make_shared<og::CellBispace>(si);
+            ompl::base::ParamSet& params = planner->params();
+            if (params.hasParam(std::string("range")))
+                params.setParam(std::string("range"), ompl::toString(range));
+            return planner;
+            break;
+        }
+        case PLANNER_CELLBISPACESTAR:
+        {
+            auto planner = std::make_shared<og::CellBispacestar>(si);
+            ompl::base::ParamSet& params = planner->params();
+            if (params.hasParam(std::string("range")))
+                params.setParam(std::string("range"), ompl::toString(range));
             return planner;
             break;
         }
@@ -245,6 +282,9 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
                 params.setParam(std::string("range"), ompl::toString(range));
             if (params.hasParam(std::string("pen_distance")))
                 params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
+            planner->setAddIntermediateState(false);
+            //planner->setUseBispace(false);
+            //planner->setBackRewire(false);
             return planner;
             break;
         }
@@ -256,6 +296,9 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
                 params.setParam(std::string("range"), ompl::toString(range));
             if (params.hasParam(std::string("pen_distance")))
                 params.setParam(std::string("pen_distance"), ompl::toString(pen_distance));
+            planner->setAddIntermediateState(false);
+            //planner->setUseBispace(false);
+            //planner->setBackRewire(false);
             return planner;
             break;
         }
@@ -334,6 +377,16 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
+        case PLANNER_NAIVECONNECT:
+        {
+            auto planner = std::make_shared<og::NaiveConnect>(si);
+            planner->setUseBispace(true);
+            ompl::base::ParamSet& params = planner->params();
+            if (params.hasParam(std::string("range")))
+                params.setParam(std::string("range"), ompl::toString(range));
+            return planner;
+            break;
+        }
         case PLANNER_SBL:
         {
             auto planner = std::make_shared<og::SBL>(si);
@@ -354,8 +407,8 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
 }
 
 // Parse the command-line arguments
-bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param, std::string &spaceType,
-        std::string &robotType, double &radius, unsigned int &run_cycle);
+bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, std::string &robot, bool &default_param, std::string &spaceType,
+        unsigned int &run_cycle, double &checkResolution, bool &doRandomSampling, bool &bispaceSampling);
 
 const base::State* getState(const base::State* state, unsigned int /*index*/)
 {
@@ -368,14 +421,14 @@ int main(int argc, char* argv[])
     bool optimal;
     bool default_param;
     double runTime;
-    double radius;
+    double checkResolution;
     PlannerType plannerType;
-    std::string env;
+    std::string env, robot;
     std::string spaceType;
-    std::string robotType;
     unsigned int run_cycle;
+    bool doRandomSampling, bispaceSampling;
     // Parse the arguments, returns true if successful, false otherwise
-    if (!argParse(argc, argv, runTime, plannerType, optimal, env, default_param, spaceType, robotType, radius, run_cycle))
+    if (!argParse(argc, argv, runTime, plannerType, optimal, env, robot, default_param, spaceType, run_cycle, checkResolution, doRandomSampling, bispaceSampling))
         return -1;
 
     ob::StateSpacePtr space;
@@ -396,45 +449,98 @@ int main(int argc, char* argv[])
     }
     else if (spaceType == "Dubins")
     {
-        auto space1(std::make_shared<ob::DubinsStateSpace>(0.02, false));
+        auto space1(std::make_shared<ob::DubinsStateSpace>(0.1, false));
         space1->setBounds(bounds);
         space = space1;
     }
     else if (spaceType == "ReedsShepp")
     {
-        auto space1(std::make_shared<ob::ReedsSheppStateSpace>(0.02));
+        auto space1(std::make_shared<ob::ReedsSheppStateSpace>(0.1));
         space1->setBounds(bounds);
         space = space1;
     }
 
     auto si(std::make_shared<ob::SpaceInformation>(space));
-    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, app::Motion_2D, 0.0001, -0.01, space, getState);
+    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, app::Motion_2D, space, getState);
     svc->setEnvironmentFile(std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
-
-    if (robotType == "polygon")
-    {
-        int vcount = 3;
-        Eigen::Vector2d vecs[vcount];
-//        double x[3] = {5.0 * 0.0086579571682871, -5.0 * 0.02506512753291945, 5.0 * 0.012808997914287135};
-//        double y[3] = {5.0 * 0.028723505664735693, 5.0 * 0.01648451945791818, -5.0 * 0.027128021904145316}
-        double x[3] = {0.0086579571682871, -0.02506512753291945, 0.012808997914287135};
-        double y[3] = {0.028723505664735693, 0.01648451945791818, -0.027128021904145316};
-        for (int i = 0; i < vcount; i++)
-            vecs[i] = Eigen::Vector2d(x[i], y[i]);
-
-        auto polygon(std::make_shared<app::geometries::Polygon>());
-        polygon->set(vecs, vcount);
-        svc->addRobotShape(polygon);
-    }
-    else if (robotType == "circle")
-    {
-        auto circle(std::make_shared<app::geometries::Circle>(radius));
-        svc->addRobotShape(circle);
-    }
+    svc->addRobotShape(std::string(OMPLAPP_RESOURCE_DIR) + "/" + robot);
 
     si->setStateValidityChecker(svc);
-    si->setStateValidityCheckingResolution(0.01);
+    si->setStateValidityCheckingResolution(checkResolution);
     si->setup();
+
+    if (doRandomSampling)
+    {
+        if (bispaceSampling)
+        {
+            base::ScopedState<base::RealVectorStateSpace> start(si);
+            base::ScopedState<base::RealVectorStateSpace> goal(si);
+            start->values[0] = 0.05;
+            start->values[1] = 0.05;
+            goal->values[0] = 0.95;
+            goal->values[1] = 0.95;
+
+            ompl::base::StateSamplerPtr sampler = si->allocStateSampler();
+            ompl::base::State *state = si->allocState();
+
+            std::ofstream ofs1("start_bispace_sampling_points.txt", std::ios::binary | std::ios::out);
+            std::ofstream ofs2("goal_bispace_sampling_points.txt", std::ios::binary | std::ios::out);
+            for (int i = 0; i < 100;)
+            {
+                sampler->sampleUniform(state);
+                if (start.distance(state) <= goal.distance(state) && svc->isValid(state))
+                {
+                    const auto* rvstate = state->as<ompl::base::RealVectorStateSpace::StateType>();
+                    ofs1 << rvstate->values[0] << " " <<  rvstate->values[1] << std::endl;
+                    i++;
+                }
+            }
+            for (int i = 0; i < 100;)
+            {
+                sampler->sampleUniform(state);
+                if (start.distance(state) >= goal.distance(state) && svc->isValid(state))
+                {
+                    const auto* rvstate = state->as<ompl::base::RealVectorStateSpace::StateType>();
+                    ofs2 << rvstate->values[0] << " " <<  rvstate->values[1] << std::endl;
+                    i++;
+                }
+            }
+            ofs1.close();
+            ofs2.close();
+            si->freeState(state);
+        }
+        else 
+        {
+            ompl::base::StateSamplerPtr sampler = si->allocStateSampler();
+            ompl::base::State *state = si->allocState();
+
+            std::ofstream ofs1("start_sampling_points.txt", std::ios::binary | std::ios::out);
+            std::ofstream ofs2("goal_sampling_points.txt", std::ios::binary | std::ios::out);
+            for (int i = 0; i < 100;)
+            {
+                sampler->sampleUniform(state);
+                if (svc->isValid(state))
+                {
+                    const auto* rvstate = state->as<ompl::base::RealVectorStateSpace::StateType>();
+                    ofs1 << rvstate->values[0] << " " <<  rvstate->values[1] << std::endl;
+                    i++;
+                }
+            }
+            for (int i = 0; i < 100;)
+            {
+                sampler->sampleUniform(state);
+                if (svc->isValid(state))
+                {
+                    const auto* rvstate = state->as<ompl::base::RealVectorStateSpace::StateType>();
+                    ofs2 << rvstate->values[0] << " " <<  rvstate->values[1] << std::endl;
+                    i++;
+                }
+            }
+            ofs1.close();
+            ofs2.close();
+            si->freeState(state);
+        }
+    }
 
     ompl::geometric::SimpleSetup setup(si);
 
@@ -470,7 +576,9 @@ int main(int argc, char* argv[])
     if (optimal)
     {
         auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
-        obj->setCostThreshold(base::Cost(1.65));
+        obj->setCostThreshold(base::Cost(1.25));
+        if (spaceType == "RealVector2") // todo change the value for different problems
+            obj->setCostThreshold(base::Cost(0.0));
         setup.setOptimizationObjective(obj);
     }
 
@@ -523,8 +631,8 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, bool &default_param,
-        std::string &spaceType, std::string &robotType, double &radius, unsigned int &run_cycle)
+bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env, std::string &robot, bool &default_param,
+        std::string &spaceType, unsigned int &run_cycle, double &checkResolution, bool &doRandomSampling, bool &bispaceSampling)
 {
     namespace bpo = boost::program_options;
 
@@ -533,13 +641,15 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
     desc.add_options()
         ("help,h", "produce help message")
         ("env,e", bpo::value<std::string>()->default_value("random_scenarios.ply"), "(Optional) Specify the polygon and circle environment, defaults to random_scenarios.ply if not given.")
+        ("robot", bpo::value<std::string>()->default_value("robot_triangle1.ply"), "(Optional) Specify the robot, defaults to robot_triangle1.ply if not given.")
         ("default_param,d", bpo::value<bool>()->default_value(false), "(Optional) Specify if the planner is set the default params.")
         ("runtime,t", bpo::value<double>()->default_value(1.0), "(Optional) Specify the runtime in seconds. Defaults to 1 and must be greater than 0.")
-        ("planner,p", bpo::value<std::string>()->default_value("RRTstar"), "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are BFMTstar, BITstar, CForest, FMTstar, InformedRRTstar, PRMstar, RRTstar, SORRTstar, RRT, RRTConnect, RRTBispace, RRTBispacestar, BiASE, BiASEstar, BiHSC, BiHSCstar, HSCASE, HSCASEstar, SBL, LSCAI, LSCAIstar.")
+        ("planner,p", bpo::value<std::string>()->default_value("RRTstar"), "(Optional) Specify the optimal planner to use, defaults to RRTstar if not given. Valid options are BFMTstar, BITstar, CForest, FMTstar, InformedRRTstar, PRMstar, RRTstar, BiRRTstar, SORRTstar, RRT, RRTConnect, NaiveConnect, RRTBispace, RRTBispacestar, CellBispace, CellBispacestar, BiASE, BiASEstar, BiHSC, BiHSCstar, HSCASE, HSCASEstar, SBL, LSCAI, LSCAIstar.")
         ("spacetype,s", bpo::value<std::string>()->default_value("RealVector2"), "(Optional) Specify the planning space type, default to RealVector2 if not given. Valid options are RealVector2, SE2, Dubins, ReedsShepp.")
-        ("robottype", bpo::value<std::string>()->default_value("polygon"), "(Optional) Specify the robot type, default to polygon if not given. Valid options are polygon, circle.")
-        ("radius", bpo::value<double>()->default_value(0.0), "(Optional) Specify the circle robot radius. Defaults to 0 and must be greater than 0.")
-        ("run_cycle,r", bpo::value<unsigned int>()->default_value(1), "(Optional) Specify the run cycles.");
+        ("run_cycle,r", bpo::value<unsigned int>()->default_value(1), "(Optional) Specify the run cycles.")
+        ("checkResolution", bpo::value<double>()->default_value(0.01), "(Optional) Specify the collision checking resolution. Defaults to 0.01 and must be greater than 0.")
+        ("doRandomSampling", bpo::value<bool>()->default_value(false), "(Optional) Specify if does random sampling test.")
+        ("bispaceSampling", bpo::value<bool>()->default_value(false), "(Optional) Specify if does bispace random sampling test.");
     bpo::variables_map vm;
     bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
     bpo::notify(vm);
@@ -563,6 +673,7 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
 
     default_param = vm["default_param"].as<bool>();
     env = vm["env"].as<std::string>();
+    robot = vm["robot"].as<std::string>();
     run_cycle = vm["run_cycle"].as<unsigned int>();
 
     // Get the specified planner as a string
@@ -605,6 +716,11 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
         optimal = true;
         planner = PLANNER_RRTSTAR;
     }
+    else if (boost::iequals("BiRRTstar", plannerStr))
+    {
+        optimal = true;
+        planner = PLANNER_BIRRTSTAR;
+    }
     else if (boost::iequals("SORRTstar", plannerStr))
     {
         optimal = true;
@@ -622,6 +738,15 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
     {
         optimal = true;
         planner = PLANNER_RRTBISPACESTAR;
+    }
+    else if (boost::iequals("CellBispace", plannerStr))
+    {
+        planner = PLANNER_CELLBISPACE;
+    }
+    else if (boost::iequals("CellBispacestar", plannerStr))
+    {
+        optimal = true;
+        planner = PLANNER_CELLBISPACESTAR;
     }
     else if (boost::iequals("BiASE", plannerStr))
     {
@@ -654,6 +779,10 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
     {
         planner = PLANNER_RRTCONNECT;
     }
+    else if (boost::iequals("NaiveConnect", plannerStr))
+    {
+        planner = PLANNER_NAIVECONNECT;
+    }
     else if (boost::iequals("SBL", plannerStr))
     {
         planner = PLANNER_SBL;
@@ -682,21 +811,9 @@ bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool
         spaceType = "ReedsShepp";
     }
 
-    robotType = vm["robottype"].as<std::string>();
-    if (boost::iequals("polygon", robotType))
-    {
-        robotType = "polygon";
-    }
-    else if (boost::iequals("circle", robotType))
-    {
-        robotType = "circle";
-    }
-    else
-    {
-        robotType = "polygon";
-    }
-
-    radius = vm["radius"].as<double>();
-
+    checkResolution = vm["checkResolution"].as<double>();
+    doRandomSampling = vm["doRandomSampling"].as<bool>();
+    bispaceSampling = vm["bispaceSampling"].as<bool>();
+    
     return true;
 }

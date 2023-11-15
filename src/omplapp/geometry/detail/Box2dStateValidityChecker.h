@@ -8,7 +8,6 @@
 #include "omplapp/geometry/GeometrySpecification.h"
 
 #include <boost/filesystem.hpp>
-#include <mutex>
 
 namespace ompl
 {
@@ -30,6 +29,7 @@ namespace ompl
             bool setEnvironmentFile(const std::string &env);
 //            void setPointRobotNumber(int num);
             bool addRobotShape(const collision::CollisionShapePtr& shape);
+            bool addRobotShape(const std::string &robot);
 
             bool isValid(const ompl::base::State *state) const override;
 
@@ -88,9 +88,11 @@ namespace ompl
 
             bool read(const std::string& filename);
 
+            bool readHeader(std::istream& s, int& numbers);
+
             bool read(std::istream &s);
 
-            bool readHeader(std::istream& s, int& numbers);
+            bool createShape(std::istream &s, std::string& name, bool active = false);
 
             MotionModel   mtype_;
 
@@ -104,11 +106,6 @@ namespace ompl
 
             /** @brief The discrete contact manager used for creating cached discrete contact managers. */
             collision::collision_box2d::Box2dDiscreteBVHManagerPtr collision_manager_;
-
-            /** @brief Contact manager caching mutex */
-            mutable std::mutex mutex_;
-            /** @brief The discrete contact manager cache */
-            mutable std::map<unsigned long int, collision::collision_box2d::Box2dDiscreteBVHManagerPtr> collision_managers_;
 
             SafetyCertificateChecker safetyCertificateChecker_ = std::bind(&Box2dStateValidityChecker::safetyCertificate, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
 

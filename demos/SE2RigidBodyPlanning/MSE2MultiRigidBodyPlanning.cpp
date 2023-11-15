@@ -27,7 +27,7 @@
 #include <ompl/geometric/planners/kpiece/LBKPIECE1.h>
 //#include <ompl/geometric/planners/ase/BiASE.h>
 #include <ompl/geometric/planners/hsc/BiHSC.h>
-#include <ompl/geometric/planners/hsc/BiHSCCell.h>
+//#include <ompl/geometric/planners/hsc/BiHSCCell.h>
 //#include <ompl/geometric/planners/hsc/HSCASE.h>
 
 // optimal planners
@@ -315,6 +315,7 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
+        /*
         case PLANNER_BIHSCCELL:
         {
             auto planner = std::make_shared<og::BiHSCCell>(si);
@@ -331,7 +332,6 @@ ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerTy
             return planner;
             break;
         }
-        /*
         case PLANNER_HSCASE:
         {
             auto planner = std::make_shared<og::HSCASE>(si);

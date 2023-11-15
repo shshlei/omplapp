@@ -49,6 +49,9 @@
 #include <ompl/tools/config/SelfConfig.h>
 #include <ompl/util/GeometricEquations.h>
 
+//#include <ompl/base/spaces/RealVectorStateSpace.h>
+//#include <fstream>
+
 ompl::geometric::CSCRRTstar::CSCRRTstar(const base::SpaceInformationPtr &si)
   : base::Planner(si, "CSCRRTstar")
 {
@@ -104,9 +107,12 @@ void ompl::geometric::CSCRRTstar::setup()
         nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<Motion *>(this));
     nn_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
 
-    if (!onn_)
-        onn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<SafetyCertificate *>(this));
-    onn_->setDistanceFunction([this](const SafetyCertificate *a, const SafetyCertificate *b) { return distanceFunction(a, b); });
+    if (useCollisionCertificateChecker_)
+    {
+        if (!onn_)
+            onn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<SafetyCertificate *>(this));
+        onn_->setDistanceFunction([this](const SafetyCertificate *a, const SafetyCertificate *b) { return distanceFunction(a, b); });
+    }
 
     // Setup optimization objective
     //
@@ -338,7 +344,7 @@ ompl::base::PlannerStatus ompl::geometric::CSCRRTstar::solve(const base::Planner
             msc = new SafetyCertificate(si_);
             si_->copyState(msc->sc, dstate);
 
-            if (onn_->size())
+            if (useCollisionCertificateChecker_ && onn_->size())
             {
                 SafetyCertificate *nsc = onn_->nearest(msc);
                 if (si_->distance(nsc->sc, dstate) <= nsc->dist) // collision certificate true
@@ -363,11 +369,22 @@ ompl::base::PlannerStatus ompl::geometric::CSCRRTstar::solve(const base::Planner
             }
             else 
             {
-                msc->dist = -dist;
-                if (dist > 0.005)
-                    onn_->add(msc);
+                if (useCollisionCertificateChecker_)
+                {
+                    msc->dist = -dist;
+                    if (msc->dist > certificateR_)
+                        onn_->add(msc);
+                    else 
+                    {
+                        si_->freeState(msc->sc);
+                        delete msc;
+                    }
+                }
                 else 
+                {
+                    si_->freeState(msc->sc);
                     delete msc;
+                }
                 continue;
             }
         }
@@ -375,7 +392,8 @@ ompl::base::PlannerStatus ompl::geometric::CSCRRTstar::solve(const base::Planner
             msc = nmotion->msc;
 
         // Check if the motion between the nearest state and the state to add is valid
-        bool cvalid = !newsc || (nmotion->msc && msc ? checkInterMotion(nmotion->state, dstate, nmotion->msc->sc, nmotion->msc->dist, msc->sc, msc->dist) : si_->checkMotion(nmotion->state, dstate));
+        bool cvalid = !newsc || (nmotion->msc && msc ? checkInterMotion(nmotion->state, dstate, nmotion->msc->sc, nmotion->msc->dist, msc->sc, msc->dist) : si_->checkMotion(nmotion->state, dstate, true));
+        //bool cvalid = !newsc || si_->checkMotion(nmotion->state, dstate, true);
 
         if (cvalid)
         {
@@ -447,7 +465,8 @@ ompl::base::PlannerStatus ompl::geometric::CSCRRTstar::solve(const base::Planner
                 {
                     bool cvalid = (motion->msc == nbh[*i]->msc && motion->msc) ||
                         (nbh[*i]->msc && motion->msc ? checkInterMotion(nbh[*i]->state, motion->state, nbh[*i]->msc->sc, nbh[*i]->msc->dist, motion->msc->sc, motion->msc->dist) : 
-                                                       si_->checkMotion(nbh[*i]->state, motion->state)); // safety certificate check
+                                                       si_->checkMotion(nbh[*i]->state, motion->state, true)); // safety certificate check
+                    //bool cvalid = (motion->msc == nbh[*i]->msc && motion->msc) || si_->checkMotion(nbh[*i]->state, motion->state, true); // safety certificate check
                     if (cvalid)
                     {
                         motion->incCost = incCosts[*i];
@@ -504,7 +523,8 @@ ompl::base::PlannerStatus ompl::geometric::CSCRRTstar::solve(const base::Planner
                             {
                                 motionValid = (motion->msc == nbh[i]->msc && motion->msc) ||
                                     (motion->msc && nbh[i]->msc ? checkInterMotion(motion->state, nbh[i]->state, motion->msc->sc, motion->msc->dist, nbh[i]->msc->sc, nbh[i]->msc->dist) : 
-                                     si_->checkMotion(motion->state, nbh[i]->state)); // safety certificate check
+                                     si_->checkMotion(motion->state, nbh[i]->state, true)); // safety certificate check
+                                //motionValid = (motion->msc == nbh[i]->msc && motion->msc) || si_->checkMotion(motion->state, nbh[i]->state, true); // safety certificate check
                             }
                         }
                         else
@@ -670,6 +690,28 @@ ompl::base::PlannerStatus ompl::geometric::CSCRRTstar::solve(const base::Planner
     OMPL_INFORM("%s: Created %u new states. Checked %u rewire options. %u goal states in tree. Final solution cost "
                 "%.3f",
                 getName().c_str(), statesGenerated, rewireTest, goalMotions_.size(), bestCost_.value());
+
+
+    /*
+    std::ofstream ofs1("simple_safety_certificate.txt", std::ios::binary | std::ios::out);
+    std::ofstream ofs2("simple_collision_certificate.txt", std::ios::binary | std::ios::out);
+    for (auto &msc : snne_)
+    {
+        const auto* rvstate = msc->sc->as<ompl::base::RealVectorStateSpace::StateType>();
+        ofs1 << rvstate->values[0] << " " <<  rvstate->values[1] << " " << msc->dist << std::endl;
+    }
+
+    if (onn_)
+    {
+        std::vector<SafetyCertificate *> certificates;
+        onn_->list(certificates);
+        for (auto &msc : certificates)
+        {
+            const auto* rvstate = msc->sc->as<ompl::base::RealVectorStateSpace::StateType>();
+            ofs2 << rvstate->values[0] << " " <<  rvstate->values[1] << " " << msc->dist << std::endl;
+        }
+    }
+    */
 
     // We've added a solution if newSolution == true, and it is an approximate solution if bestGoalMotion_ == false
     return {newSolution != nullptr, bestGoalMotion_ == nullptr};
@@ -1202,16 +1244,117 @@ void ompl::geometric::CSCRRTstar::calculateRewiringLowerBounds()
 
 bool ompl::geometric::CSCRRTstar::checkInterMotion(const base::State *s1, const base::State *s2, const base::State *sc1, double dist1, const base::State *sc2, double dist2)
 {
-    /*assume smotion, gmotion are valid*/
+    bool valid = true;
+    int nd = si_->getStateSpace()->validSegmentCount(s1, s2);
+    if (nd >= 2)
+    {
+        double dist = si_->distance(sc1, s2);
+        if (dist < dist1)
+            return valid;
+        dist = si_->distance(sc2, s1);
+        if (dist < dist2)
+            return valid;
+        base::State *st = si_->allocState();
+        base::State *st2 = si_->allocState();
+        double low = 0.0, high = 1.0, middle = 0.5, delta = 1.0 / (double)nd;
+        while (high > low + delta)
+        {
+            si_->getStateSpace()->interpolate(s1, s2, middle, st);
+            double d1 = si_->distance(sc1, st);
+            double d2 = si_->distance(sc2, st);
+            if (d1 < dist1)
+            {
+                if (d2 < dist2)
+                    break;
+                else
+                    low = middle;
+            }
+            else if (d2 < dist2)
+                high = middle;
+            else if (!si_->isValid(st))
+            {
+                valid = false;
+                break;
+            }
+            else 
+            {
+                double temp = middle, middle2 = 0.5 * (low + middle);
+                si_->copyState(st2, st);
+                while (middle > low + delta)
+                {
+                    si_->getStateSpace()->interpolate(s1, s2, middle2, st);
+                    d1 = si_->distance(sc1, st);
+                    if (d1 < dist1)
+                        low = middle2;
+                    else if (!si_->isValid(st))
+                    {
+                        valid = false;
+                        break;
+                    }
+                    else if (!si_->checkMotion(st, st2, true))
+                    {
+                        valid = false;
+                        break;
+                    }
+                    else
+                    {
+                        si_->copyState(st2, st);
+                        middle = middle2;
+                    }
+                    middle2 = 0.5 * (low + middle);
+                }
+                if (!valid)
+                    break;
+                middle = temp, middle2 = 0.5 * (high + middle);
+                si_->getStateSpace()->interpolate(s1, s2, middle, st2);
+                while (high > middle + delta)
+                {
+                    si_->getStateSpace()->interpolate(s1, s2, middle2, st);
+                    d2 = si_->distance(sc2, st);
+                    if (d2 < dist2)
+                        high = middle2;
+                    else if (!si_->isValid(st))
+                    {
+                        valid = false;
+                        break;
+                    }
+                    else if (!si_->checkMotion(st2, st, true))
+                    {
+                        valid = false;
+                        break;
+                    }
+                    else 
+                    {
+                        si_->copyState(st2, st);
+                        middle = middle2;
+                    }
+                    middle2 = 0.5 * (high + middle);
+                }
+                break;
+            }
+            middle = 0.5 * (low + high);
+        }
+        si_->freeState(st);
+        si_->freeState(st2);
+    }
+
+    return valid;
+}
+
+/*
+bool ompl::geometric::CSCRRTstar::checkInterMotion(const base::State *s1, const base::State *s2, const base::State *sc1, double dist1, const base::State *sc2, double dist2)
+{
     bool valid = true;
     int nd = si_->getStateSpace()->validSegmentCount(s1, s2);
     if (nd >= 2)
     {
         bool in1 = true; // in the first certificate region
         base::State *st = si_->allocState();
+        double ratio = 1.0 / (double)nd, delta = ratio;
         for (int i = 1; i < nd; i++)
         {
-            si_->getStateSpace()->interpolate(s1, s2, (double)i / (double)nd, st);
+            si_->getStateSpace()->interpolate(s1, s2, ratio, st);
+            ratio += delta;
             if (in1)
             {
                 if (si_->distance(sc1, st) <= dist1)
@@ -1230,3 +1373,4 @@ bool ompl::geometric::CSCRRTstar::checkInterMotion(const base::State *s1, const 
     }
     return valid;
 }
+*/
