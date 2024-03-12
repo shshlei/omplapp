@@ -112,16 +112,6 @@ namespace ompl
                 return certificateR_;
             }
 
-            void setUseCollisionCertificateChecker(bool use)
-            {
-                useCollisionCertificateChecker_ = use;
-            }
-
-            bool getUseCollisionCertificateChecker() const
-            {
-                return useCollisionCertificateChecker_;
-            }
-
         protected:
 
             struct SafetyCertificate 
@@ -187,15 +177,13 @@ namespace ompl
              * available) */
             double goalBias_{.05};
 
-            double certificateR_{0.0001};
+            double certificateR_{0.005};
 
             /** \brief The random number generator */
             RNG rng_;
 
             /** \brief The most recent goal motion.  Used for PlannerData computation */
             Motion *lastGoalMotion_{nullptr};
-
-            bool useCollisionCertificateChecker_{false};
         };
     }
 }

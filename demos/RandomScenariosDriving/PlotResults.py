@@ -1,0 +1,273 @@
+#!/usr/bin/env python
+
+######################################################################
+# Software License Agreement (BSD License)
+#
+#  Copyright (c) 2012, Rice University
+#  All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions
+#  are met:
+#
+#   * Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#   * Redistributions in binary form must reproduce the above
+#     copyright notice, this list of conditions and the following
+#     disclaimer in the documentation and/or other materials provided
+#     with the distribution.
+#   * Neither the name of the Rice University nor the names of its
+#     contributors may be used to endorse or promote products derived
+#     from this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+#  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+#  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+#  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+#  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+#  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+#  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+#  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+#  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+#  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+#  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+######################################################################
+
+# Author: Shi Shenglei
+
+import os
+import argparse
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from matplotlib.patches import Circle, Polygon, Rectangle, Ellipse, FancyArrow
+from matplotlib.collections import PatchCollection
+
+from shapely.geometry import LineString as SLineString
+from descartes import PolygonPatch as SPolygonPatch
+
+from math import cos, sin, sqrt
+
+# vehicle params
+l = 0.028
+l1 = 0.0096
+l2 = 0.00929
+W = 0.01942
+L = l + l1 + l2
+crx = 0.25 * L - l2
+cfx = 0.75 * L - l2
+cradius = sqrt(0.25*L*0.25*L + 0.5*W*0.5*W)
+
+if __name__ == "__main__":
+    # Create an argument parser
+    parser = argparse.ArgumentParser(description='Draw Trajectory.')
+    parser.add_argument('--scenario', default=None, \
+        help='Filename of random scenario')
+    parser.add_argument('-t', '--time', default=None, \
+        help='Filename of time trajectory')
+    parser.add_argument('-s', '--states', default=None, \
+        help='Filename of states trajectory')
+    parser.add_argument('-c', '--controls', default=None, \
+        help='Filename of controls trajectory')
+    parser.add_argument('-p', '--points', default=None, \
+        help='Filename of active points')
+    parser.add_argument('-b', '--box', default=None, \
+        help='Filename of box')
+    args = parser.parse_args()
+
+    plt.style.use(['seaborn-v0_8-deep', 'seaborn-v0_8-paper'])
+    plt.rcParams.update({'axes.grid': False})
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    colors = prop_cycle.by_key()['color'] #['#4C72B0', '#55A868', '#C44E52', '#8172B2', '#CCB974', '#64B5CD']
+    colors = ['#1072b4', '#ef7f00', '#1f9c3a', '#d6191b', '#9763a6', '#965947', '#db79ae', '#c0c205', '#26b9ce', '#2a3377', '#7f3b71', '#9fa0a0']
+
+    fig, ax = plt.subplots(figsize=(2.5, 2.5))
+
+    if args.scenario:
+        nobstacle = 0
+        patches_circle = []
+        patches_polygon = []
+        patches_ellipse = []
+        patches_capsule = []
+        patches_rectangle = []
+        for line in open(args.scenario, 'r').readlines():
+            l = line.strip()
+            if not l:
+                continue
+            if l[0] == '#':
+                continue
+            if l == 'shapes':
+                continue
+            if nobstacle == 0:
+                temp = l.split(' ')
+                if temp[0] == 'numbers':
+                    nobstacle = int(temp[1])
+                    continue
+            params = [float(x) for x in l.split(' ')]
+            params[0] = int(params[0])
+            if params[0] == 0: # circle
+                x = params[1]
+                y = params[2]
+                r = params[3]
+                circle = Circle((x, y), r, color = 'gray')
+                patches_circle.append(circle)
+            elif params[0] == 1: # polygon
+                params[1] = int(params[1])
+                count = params[1]
+                vecs = params[2:]
+                x = vecs[::2]
+                y = np.array(vecs[1::2])
+                polygon = Polygon(np.array([x,y]).transpose(), color = 'gray')
+                patches_polygon.append(polygon)
+            elif params[0] == 2: # ellipse
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                a = params[4]
+                b = params[5]
+                ellipse = Ellipse((x, y), 2.0 * a, 2.0 * b, angle = 180.0 * yaw / np.pi, color = 'gray')
+                patches_ellipse.append(ellipse)
+            elif params[0] == 3: # capsule
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                r = params[4]
+                h = params[5]
+                s = sin(yaw)
+                c = cos(yaw)
+                p1 = (x - s * h, y + c * h)
+                p2 = (x + s * h, y - c * h)
+                capsule = SLineString([p1, p2]).buffer(r)
+                patches_capsule.append(SPolygonPatch(capsule, fc='gray', ec='gray'))
+            elif params[0] == 4: # rectangle
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                a = params[4]
+                b = params[5]
+                s = sin(yaw)
+                c = cos(yaw)
+                R = np.array(((c, -s), (s, c)))
+                xy = np.array(((-a, a, a, -a),(-b, -b, b, b)))
+                xy = R.dot(xy)
+                x1, y1 = xy
+                x1 = x1 + x
+                y1 = y1 + y
+                rect = Polygon(np.array([x1,y1]).transpose(), color = 'gray')
+                patches_rectangle.append(rect)
+        pcc = PatchCollection(patches_circle, match_original=False)
+        pcp = PatchCollection(patches_polygon, match_original=False)
+        pce = PatchCollection(patches_ellipse, match_original=False)
+        pccap = PatchCollection(patches_capsule, match_original=False)
+        pcrect = PatchCollection(patches_rectangle, match_original=False)
+        pcc.set_color('gray')
+        pcp.set_color('gray')
+        pce.set_color('gray')
+        pccap.set_color('gray')
+        pcrect.set_color('gray')
+        ax.add_collection(pcc)
+        ax.add_collection(pcp)
+        ax.add_collection(pce)
+        ax.add_collection(pccap)
+        ax.add_collection(pcrect)
+
+    time = []
+    states = []
+    points = []
+    if args.time:
+        line = open(args.time, 'r').readline()
+        line = line.strip()
+        time=[float(x) for x in line.split(' ')]
+    if args.states:
+        for line in open(args.states, 'r').readlines():
+            line = line.strip()
+            if not line:
+                continue
+            state = [float(x) for x in line.split(' ')]
+            states.append(state)
+        states = np.array(states).T
+    if args.points:
+        points = []
+        for line in open(args.points, 'r').readlines():
+            line = line.strip()
+            if not line:
+                continue
+            point = [float(x) for x in line.split(' ')]
+            points.append(point)
+        points = np.array(points).T
+
+    if args.states:
+        patches_rectangle = []
+        patches_arrow = []
+        for i, x, y, theta in zip(range(len(states[0])), states[0], states[1], states[2]):
+            #box = Rectangle((x - l2 - 0.02, y - 0.5 * W - 0.02), L + 0.04, W + 0.04, angle = 180.0 * theta / np.pi, rotation_point=(x, y), facecolor='w', edgecolor='r', lw=0.5, fill=False, zorder=1)
+            #patches_rectangle.append(box)
+            #corners = np.array(box.get_corners()).T
+            #ax.plot(corners[0][range(2)], corners[1][range(2)], color='r', lw=0.5)
+            #ax.plot(corners[0][range(2, 4)], corners[1][range(2, 4)], color='r', lw=0.5)
+            rect = Rectangle((x - l2, y - 0.5 * W), L, W, angle = 180.0 * theta / np.pi, rotation_point=(x, y), facecolor='w', edgecolor='#1f9c3a', lw=0.5, zorder=10, fill=False)
+            patches_rectangle.append(rect)
+            arrow = FancyArrow(x, y, 0.01* cos(theta), 0.01* sin(theta), width = 0.0005, color = 'r')
+            patches_arrow.append(arrow)
+        pcrect = PatchCollection(patches_rectangle, match_original=True)
+        ax.add_collection(pcrect)
+        parrow = PatchCollection(patches_arrow, match_original=True)
+        ax.add_collection(parrow)
+    if args.points:
+        ax.scatter(points[1], points[2], facecolor='r', edgecolor='k', s=5.0)
+    if args.box:
+        patches_box = []
+        for line in open(args.box, 'r').readlines():
+            line = line.strip()
+            if not line:
+                continue
+            point = [float(x) for x in line.split(' ')]
+            box = Rectangle((point[0], point[1]), point[2], point[3], angle=0.0, facecolor='w', edgecolor='#1072b4', lw=0.5, zorder=10, fill=False)
+            patches_box.append(box)
+        pcbox = PatchCollection(patches_box, match_original=True)
+        ax.add_collection(pcbox)
+    if args.states and args.box:
+        patches_circle = []
+        for i, x, y, theta in zip(range(len(states[0])), states[0], states[1], states[2]):
+            cx = x + crx * cos(theta)
+            cy = y + crx * sin(theta)
+            circle = Circle((cx, cy), cradius, color='#1f9c3a', lw=0.5, fill=False)
+            patches_circle.append(circle)
+            ax.scatter(x, y, s=1, color='#B30059')
+        pccircle = PatchCollection(patches_circle, match_original=True)
+        ax.add_collection(pccircle)
+
+    if False:
+        """start and goal polygon"""
+        x = 0.05
+        y = 0.05
+        rect = Rectangle((x - l2, y - 0.5 * W), L, W, angle=0.0, color='g')
+        arrow = FancyArrow(x, y, 0.02, 0.0, width = 0.0010, color = 'k')
+        ax.add_patch(rect)
+        ax.add_patch(arrow)
+        ax.scatter(x, y, color='r', s = 1.2)
+
+        x = 0.95
+        y = 0.95
+        rect = Rectangle((x - l2, y - 0.5 * W), L, W, angle=0.0, color='r')
+        arrow = FancyArrow(x, y, 0.02, 0.0, width = 0.0010, color = 'k')
+        ax.add_patch(rect)
+        ax.add_patch(arrow)
+        ax.scatter(x, y, color='#1f9c3a', s = 1.2)
+
+    ax.yaxis.set_tick_params(which='major', direction = 'in', width=1.0, length=3, labelsize=10.5)
+    ax.xaxis.set_tick_params(which='major', direction = 'in', width=1.0, length=3, labelsize=10.5)
+
+    #ax.set_xlim(0.0, 1.0)
+    #ax.set_ylim(0.0, 1.0)
+    #ax.autoscale(enable=None, axis="both", tight=True)
+    ax.margins(0.05, 0.1)
+    ax.set_axis_on()
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect('equal')
+    plt.tight_layout()
+    plt.savefig('parking.svg')
+    plt.show()

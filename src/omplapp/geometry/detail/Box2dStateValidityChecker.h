@@ -23,13 +23,9 @@ namespace ompl
 
             using DistanceCertificate = std::function<std::vector<double>(const base::State *a, const base::State *b)>;
 
-            Box2dStateValidityChecker(const ompl::base::SpaceInformationPtr& si, MotionModel mtype,  
-                                      const base::StateSpacePtr &gspace, const GeometricStateExtractor &se);
+            Box2dStateValidityChecker(const ompl::base::SpaceInformationPtr& si, const base::StateSpacePtr &gspace);
 
-            bool setEnvironmentFile(const std::string &env);
-//            void setPointRobotNumber(int num);
-            bool addRobotShape(const collision::CollisionShapePtr& shape);
-            bool addRobotShape(const std::string &robot);
+            Box2dStateValidityChecker(const ompl::base::SpaceInformationPtr& si, const base::StateSpacePtr &gspace, const GeometricStateExtractor &se);
 
             bool isValid(const ompl::base::State *state) const override;
 
@@ -46,6 +42,13 @@ namespace ompl
             bool safetyCertificate(const ompl::base::State *state, const ompl::base::SafetyCertificate *sc, std::vector<double> &dist) const;
 
             std::vector<double> distanceCertificate(const base::State *a, const base::State *b) const;
+
+            const std::vector<std::string> & getRobotNames() const;
+
+            const collision::collision_box2d::Box2dDiscreteBVHManagerPtr getBox2dDiscreteBVHManager() const 
+            {
+                return collision_manager_;
+            }
 
             CollisionCertificateChecker getCollisionCertificateChecker() const
             {
@@ -67,11 +70,6 @@ namespace ompl
                 return names_;
             }
 
-            MotionModel getMotionModel() const 
-            {
-                return mtype_;
-            }
-
             /** \brief set path to search for mesh files */
             void setMeshPath(const std::vector<boost::filesystem::path>& path)
             {
@@ -81,20 +79,22 @@ namespace ompl
                 meshPath_ = path;
             }
 
+        public:
+
+            bool setEnvironmentFile(const std::string &env);
+
+            bool addRobotShape(const collision::CollisionShapePtr& shape);
+
+            bool addRobotShape(const std::string &robot);
+
+            void removeRobotShape(const std::string & name);
+
+            void clearRobotShapes();
+
         private:
 
             /** \brief return absolute path to mesh file if it exists and an empty path otherwise */
             boost::filesystem::path findMeshFile(const std::string& fname);
-
-            bool read(const std::string& filename);
-
-            bool readHeader(std::istream& s, int& numbers);
-
-            bool read(std::istream &s);
-
-            bool createShape(std::istream &s, std::string& name, bool active = false);
-
-            MotionModel   mtype_;
 
             base::StateSpacePtr gspace_;
 

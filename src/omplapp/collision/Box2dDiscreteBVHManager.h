@@ -223,7 +223,9 @@ namespace ompl
                     * @param collisions The Contact results data
                     */
                     virtual bool contactTest();
+
                     virtual bool pointTest(const Eigen::Vector2d& point);
+
                     virtual bool contactTest(base::ContactResult& collisions);
 
                     virtual double distanceTest(double &dist);
@@ -233,6 +235,16 @@ namespace ompl
                     {
                         return broadphase_;
                     }
+
+                public:
+
+                    bool setEnvironmentFile(const std::string &env);
+
+                    bool addRobotShape(const std::string &robot, const std::string & name);
+
+                    void removeRobotShape(const std::string & name);
+
+                    void clearRobotShapes();
 
                 private:
 
@@ -258,9 +270,13 @@ namespace ompl
                     };
 
                     std::vector<std::string> active_; 
+
                     double contact_distance_;         /**< @brief The contact distance threshold */
+
                     std::unique_ptr<b2BVHManager> broadphase_; /**< @brief The box2d broadphase interface */
+
                     CollisionShapes m_shapes;                    /**< @brief The shapes that define the collison object */
+
                     geometries::VectorIsometry2d m_shape_poses; /**< @brief The shpaes poses information */
                 };
             }

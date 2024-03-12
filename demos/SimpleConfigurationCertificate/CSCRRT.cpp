@@ -64,12 +64,9 @@ void ompl::geometric::CSCRRT::setup()
         nn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<Motion *>(this));
     nn_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
 
-    if (useCollisionCertificateChecker_)
-    {
-        if (!onn_)
-            onn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<SafetyCertificate *>(this));
-        onn_->setDistanceFunction([this](const SafetyCertificate *a, const SafetyCertificate *b) { return distanceFunction(a, b); });
-    }
+    if (!onn_)
+        onn_.reset(tools::SelfConfig::getDefaultNearestNeighbors<SafetyCertificate *>(this));
+    onn_->setDistanceFunction([this](const SafetyCertificate *a, const SafetyCertificate *b) { return distanceFunction(a, b); });
 }
 
 void ompl::geometric::CSCRRT::freeMemory()
@@ -187,7 +184,7 @@ ompl::base::PlannerStatus ompl::geometric::CSCRRT::solve(const base::PlannerTerm
             msc->sc = si_->allocState();
             si_->copyState(msc->sc, dstate);
 
-            if (useCollisionCertificateChecker_ && onn_->size())
+            if (onn_->size())
             {
                 SafetyCertificate *nsc = onn_->nearest(msc);
                 if (si_->distance(nsc->sc, dstate) <= nsc->dist) // collision certificate true
@@ -212,28 +209,17 @@ ompl::base::PlannerStatus ompl::geometric::CSCRRT::solve(const base::PlannerTerm
             }
             else 
             {
-                if (useCollisionCertificateChecker_)
-                {
-                    msc->dist = -dist;
-                    if (msc->dist > certificateR_)
-                        onn_->add(msc);
-                    else 
-                    {
-                        si_->freeState(msc->sc);
-                        delete msc;
-                    }
-                }
+                msc->dist = -dist;
+                if (dist > 0.005)
+                    onn_->add(msc);
                 else 
-                {
-                    si_->freeState(msc->sc);
                     delete msc;
-                }
                 continue;
             }
         }
         else
             msc = nmotion->msc;
-        bool valid = !newsc || (nmotion->msc && msc ? checkInterMotion(nmotion->state, dstate, nmotion->msc->sc, nmotion->msc->dist, dstate, msc->dist) : si_->checkMotion(nmotion->state, dstate, true));
+        bool valid = !newsc || (nmotion->msc && msc ? checkInterMotion(nmotion->state, dstate, nmotion->msc->sc, nmotion->msc->dist, dstate, msc->dist) : si_->checkMotion(nmotion->state, dstate));
         if (valid)
         {
             Motion *motion = new Motion(si_);
@@ -327,99 +313,31 @@ void ompl::geometric::CSCRRT::getPlannerData(base::PlannerData &data) const
 
 bool ompl::geometric::CSCRRT::checkInterMotion(const base::State *s1, const base::State *s2, const base::State *sc1, double dist1, const base::State *sc2, double dist2)
 {
+    /*assume smotion, gmotion are valid*/
     bool valid = true;
     int nd = si_->getStateSpace()->validSegmentCount(s1, s2);
     if (nd >= 2)
     {
-        double dist = si_->distance(sc1, s2);
-        if (dist < dist1)
-            return valid;
-        dist = si_->distance(sc2, s1);
-        if (dist < dist2)
-            return valid;
+        bool in1 = true; // in the first certificate region
         base::State *st = si_->allocState();
-        base::State *st2 = si_->allocState();
-        double low = 0.0, high = 1.0, middle = 0.5, delta = 1.0 / (double)nd;
-        while (high > low + delta)
+        for (int i = 1; i < nd; i++)
         {
-            si_->getStateSpace()->interpolate(s1, s2, middle, st);
-            double d1 = si_->distance(sc1, st);
-            double d2 = si_->distance(sc2, st);
-            if (d1 < dist1)
+            si_->getStateSpace()->interpolate(s1, s2, (double)i / (double)nd, st);
+            if (in1)
             {
-                if (d2 < dist2)
-                    break;
-                else
-                    low = middle;
+                if (si_->distance(sc1, st) <= dist1)
+                    continue;
+                in1 = false;
             }
-            else if (d2 < dist2)
-                high = middle;
-            else if (!si_->isValid(st))
+            if (si_->distance(sc2, st) <= dist2)
+                break;
+            if (!si_->isValid(st))
             {
                 valid = false;
                 break;
             }
-            else 
-            {
-                double temp = middle, middle2 = 0.5 * (low + middle);
-                si_->copyState(st2, st);
-                while (middle > low + delta)
-                {
-                    si_->getStateSpace()->interpolate(s1, s2, middle2, st);
-                    d1 = si_->distance(sc1, st);
-                    if (d1 < dist1)
-                        low = middle2;
-                    else if (!si_->isValid(st))
-                    {
-                        valid = false;
-                        break;
-                    }
-                    else if (!si_->checkMotion(st, st2, true))
-                    {
-                        valid = false;
-                        break;
-                    }
-                    else
-                    {
-                        si_->copyState(st2, st);
-                        middle = middle2;
-                    }
-                    middle2 = 0.5 * (low + middle);
-                }
-                if (!valid)
-                    break;
-                middle = temp, middle2 = 0.5 * (high + middle);
-                si_->getStateSpace()->interpolate(s1, s2, middle, st2);
-                while (high > middle + delta)
-                {
-                    si_->getStateSpace()->interpolate(s1, s2, middle2, st);
-                    d2 = si_->distance(sc2, st);
-                    if (d2 < dist2)
-                        high = middle2;
-                    else if (!si_->isValid(st))
-                    {
-                        valid = false;
-                        break;
-                    }
-                    else if (!si_->checkMotion(st2, st, true))
-                    {
-                        valid = false;
-                        break;
-                    }
-                    else 
-                    {
-                        si_->copyState(st2, st);
-                        middle = middle2;
-                    }
-                    middle2 = 0.5 * (high + middle);
-                }
-                break;
-            }
-            middle = 0.5 * (low + high);
         }
         si_->freeState(st);
-        si_->freeState(st2);
     }
-
     return valid;
 }

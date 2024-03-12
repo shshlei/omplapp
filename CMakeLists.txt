@@ -150,8 +150,7 @@ set_package_properties(fcl PROPERTIES
     PURPOSE "The default collision checking library.")
 find_package(octomap QUIET)
 find_package(fcl 0.7 REQUIRED)
-add_definitions(-DB2_USE_DOUBLE_PRECISION)
-add_definitions(-DBT_USE_DOUBLE_PRECISION)
+#add_definitions(-DBT_USE_DOUBLE_PRECISION)
 find_package(Bullet REQUIRED)
 find_package(Box2DCollision REQUIRED)
 set_package_properties(Threads PROPERTIES

@@ -39,7 +39,6 @@
 #include <ompl/util/Console.h>
 
 #include <functional>
-#include <boost/bind.hpp>
 
 #include <LinearMath/btConvexHullComputer.h>
 #include <cstdio>

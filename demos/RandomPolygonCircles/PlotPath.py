@@ -92,7 +92,7 @@ if __name__ == "__main__":
     parser.add_argument('-pd', '--plannerdata', default=None, \
         help='(Optional) Filename of the planner data.')
     parser.add_argument('-pd2', '--plannerdata2', default=None, \
-        help='(Optional) Filename of the planner data.')
+        help='(Optional) Filename of the SE2 planner data.')
     parser.add_argument('-paths', nargs='*')
     args = parser.parse_args()
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     tx = [0.00232897858414355, -0.006532563766459726, 0.003404498957143567];
     ty = [0.007361752832367847, 0.00424225972895909, -0.007564010952072658];
 
-    fig, ax = plt.subplots(figsize=(1.8, 1.8))
+    fig, ax = plt.subplots(figsize=(2.5, 2.5))
     if args.scenario:
         nobstacle = 0
         patches_circle = []
@@ -239,7 +239,7 @@ if __name__ == "__main__":
             y = -dxy[1]
         if len(dxy) == 3:
             theta = dxy[2]
-        if True:
+        if False:
             xx = list(x)
             yy = list(y)
             tt = list(theta)
@@ -565,6 +565,5 @@ if __name__ == "__main__":
     if invert_yaxis:
         plt.savefig('random_scenarios.pdf')
     else:
-        plt.savefig('random_scenarios.eps')
         plt.show()
 

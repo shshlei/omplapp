@@ -461,7 +461,7 @@ int main(int argc, char* argv[])
     }
 
     auto si(std::make_shared<ob::SpaceInformation>(space));
-    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, app::Motion_2D, space, getState);
+    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, space, getState);
     svc->setEnvironmentFile(std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
     svc->addRobotShape(std::string(OMPLAPP_RESOURCE_DIR) + "/" + robot);
 

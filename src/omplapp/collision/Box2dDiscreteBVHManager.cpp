@@ -341,6 +341,30 @@ namespace ompl
                 {
                     return broadphase_->Distance(dist);
                 }
+
+                bool Box2dDiscreteBVHManager::setEnvironmentFile(const std::string &env)
+                {
+                    return broadphase_->setEnvironmentFile(env);
+                }
+
+                bool Box2dDiscreteBVHManager::addRobotShape(const std::string &robot, const std::string & name)
+                {
+                    bool successs = broadphase_->addRobotShape(robot, name);
+                    if (successs) active_.push_back(name);
+                    return successs;
+                }
+
+                void Box2dDiscreteBVHManager::removeRobotShape(const std::string & name)
+                {
+                    active_.erase(std::find(active_.begin(), active_.end(), name));
+                    broadphase_->removeRobotShape(name);
+                }
+
+                void Box2dDiscreteBVHManager::clearRobotShapes()
+                {
+                    active_.clear();
+                    broadphase_->clearRobotShapes();
+                }
             }
         }
     }

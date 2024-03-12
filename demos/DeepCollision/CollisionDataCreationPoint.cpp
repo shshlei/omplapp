@@ -190,7 +190,7 @@ bool argParse(int argc, char** argv, std::size_t &objects, std::size_t &points, 
         ("objects", bpo::value<std::size_t>()->default_value(1000), "Objects number")
         ("points", bpo::value<std::size_t>()->default_value(1000), "Points number")
         ("circle", bpo::value<bool>()->default_value(false), "Generate circle datas")
-        ("ellipse", bpo::value<bool>()->default_value(false), "Generate ellipse datas")
+        ("ellipse", bpo::value<bool>()->default_value(true), "Generate ellipse datas")
         ("capsule", bpo::value<bool>()->default_value(false), "Generate capsule datas")
         ("rectangle", bpo::value<bool>()->default_value(false), "Generate rectangle datas");
     bpo::variables_map vm;

@@ -1,0 +1,1107 @@
+/*********************************************************************
+* Software License Agreement (BSD License)
+*
+*  Copyright (c) 2010, Rice University
+*  All rights reserved.
+*
+*  Redistribution and use in source and binary forms, with or without
+*  modification, are permitted provided that the following conditions
+*  are met:
+*
+*   * Redistributions of source code must retain the above copyright
+*     notice, this list of conditions and the following disclaimer.
+*   * Redistributions in binary form must reproduce the above
+*     copyright notice, this list of conditions and the following
+*     disclaimer in the documentation and/or other materials provided
+*     with the distribution.
+*   * Neither the name of the Rice University nor the names of its
+*     contributors may be used to endorse or promote products derived
+*     from this software without specific prior written permission.
+*
+*  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+*  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+*  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+*  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+*  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+*  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+*  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+*  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+*  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+*  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+*  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+*  POSSIBILITY OF SUCH DAMAGE.
+*********************************************************************/
+
+/* Author: Shi Shenglei */
+
+#include <omplapp/config.h>
+#include <omplapp/geometry/detail/Box2dStateValidityChecker.h>
+
+#include <ompl/base/StateSpace.h>
+#include <ompl/base/SpaceInformation.h>
+#include <ompl/geometric/SimpleSetup.h>
+#include <ompl/base/spaces/SE2StateSpace.h>
+#include <ompl/base/spaces/DubinsStateSpace.h>
+#include <ompl/base/spaces/ReedsSheppStateSpace.h>
+
+// path simplify
+#include <ompl/geometric/PathSimplifier.h>
+
+// feasible planners
+#include <ompl/geometric/planners/rrt/RRT.h>
+#include <ompl/geometric/planners/rrt/RRTConnect.h>
+#include <ompl/geometric/planners/ase/BiASE.h>
+
+// optimal planners
+#include <ompl/base/objectives/PathLengthOptimizationObjective.h>
+#include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/geometric/planners/rrt/InformedRRTstar.h>
+#include <ompl/geometric/planners/informedtrees/BITstar.h>
+#include <ompl/geometric/planners/ase/BiASEstar.h>
+
+#include <ompl/base/PlannerData.h>
+#include <ompl/base/PlannerDataStorage.h>
+
+#include <box2d_collision/b2_math.h>
+#include <box2d_collision/b2_distance.h>
+#include <box2d_collision/b2_bvh_manager.h>
+
+#include <psopt/problem.hpp>
+#include <psopt/solver.hpp>
+#include <psopt/interpolation.hpp>
+#include <psopt/bomp/utils.hpp>
+#include <psopt/bomp/collision_constraints/J_function_collision_constraints.h>
+#include <psopt/bomp/four_scenarios_parking/four_scenarios_basic_setup.h>
+
+#include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
+#include <iostream>
+
+using namespace ompl;
+namespace ob = ompl::base;
+namespace og = ompl::geometric;
+
+// An enum of supported optimal planners, alphabetical order
+enum PlannerType
+{
+    PLANNER_RRT,
+    PLANNER_RRTCONNECT,
+    PLANNER_BIASE,
+    PLANNER_RRTSTAR,
+    PLANNER_INF_RRTSTAR,
+    PLANNER_BITSTAR,
+    PLANNER_BIASESTAR,
+};
+
+ob::PlannerPtr allocatePlanner(ob::SpaceInformationPtr si, PlannerType plannerType)
+{
+    switch (plannerType)
+    {
+        case PLANNER_RRT:
+        {
+            auto planner = std::make_shared<og::RRT>(si);
+            return planner;
+            break;
+        }
+        case PLANNER_RRTCONNECT:
+        {
+            auto planner = std::make_shared<og::RRTConnect>(si);
+            return planner;
+            break;
+        }
+        case PLANNER_BIASE:
+        {
+            auto planner = std::make_shared<og::BiASE>(si);
+            return planner;
+            break;
+        }
+        case PLANNER_RRTSTAR:
+        {
+            auto planner = std::make_shared<og::RRTstar>(si);
+            return planner;
+            break;
+        }
+        case PLANNER_INF_RRTSTAR:
+        {
+            auto planner = std::make_shared<og::InformedRRTstar>(si);
+            return planner;
+            break;
+        }
+        case PLANNER_BITSTAR:
+        {
+            auto planner = std::make_shared<og::BITstar>(si);
+            return planner;
+            break;
+        }
+        case PLANNER_BIASESTAR:
+        {
+            auto planner = std::make_shared<og::BiASEstar>(si);
+            return planner;
+            break;
+        }
+        default:
+        {
+            OMPL_ERROR("Planner-type enum is not implemented in allocation function.");
+            return ob::PlannerPtr(); // Address compiler warning re: no return value.
+            break;
+        }
+    }
+}
+
+// Parse the command-line arguments
+bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env,
+        std::string &spaceType, double &checkResolution, bool & parking_forward, int & parking_scenario, int & parking_case, std::size_t & expected_nnodes);
+
+const base::State* getState(const base::State* state, unsigned int /*index*/)
+{
+    return state;
+}
+
+void setBounds(int parking_scenario, ob::RealVectorBounds & bounds)
+{
+    bounds.setLow(-20.0);
+    bounds.setHigh(20.0);
+    if (parking_scenario == 0)
+    {
+        bounds.setLow(0, -10.0);
+        bounds.setHigh(0, 10.0);
+        bounds.setLow(1, -5.0);
+        bounds.setHigh(1, 3.0);
+    }
+    else if (parking_scenario == 1)
+    {
+        bounds.setLow(0, -12.0);
+        bounds.setHigh(0, 12.0);
+        bounds.setLow(1, -5.0);
+        bounds.setHigh(1, 3.0);
+    }
+    else if (parking_scenario == 2)
+    {
+        bounds.setLow(0, -10.0);
+        bounds.setHigh(0, 6.0);
+        bounds.setLow(1, -5.0);
+        bounds.setHigh(1, 5.0);
+    }
+    else if (parking_scenario == 3)
+    {
+        bounds.setLow(0, -15.0);
+        bounds.setHigh(0, 15.0);
+        bounds.setLow(1, 0.0);
+        bounds.setHigh(1, 12.0);
+    }
+}
+
+void setStartAndGoal(ompl::geometric::SimpleSetup & setup, double & x0, double & y0, double & theta0, bool parking_forward, int parking_scenario, int parking_case)
+{
+    double pi = boost::math::constants::pi<double>();
+    if (parking_forward)
+    {
+        if (parking_scenario == 0)
+        {
+            if (parking_case == 0)
+            {
+                x0 = -6.0;
+                y0 = -2.75;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 1)
+            {
+                x0 = 0.0;
+                y0 = -2.75;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 2)
+            {
+                x0 = 0.0;
+                y0 = -2.75;
+                theta0 = pi - 0.0001;
+            }
+        }
+        else if (parking_scenario == 1)
+        {
+            if (parking_case == 0)
+            {
+                x0 = -6.0;
+                y0 = -2.5;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 1)
+            {
+                x0 = -8.0;
+                y0 = 0.0;
+                theta0 = -35.0 * pi / 180.0;
+            }
+            else if (parking_case == 2)
+            {
+                x0 = -4.0;
+                y0 = -3.0;
+                theta0 = 0.0;
+            }
+        }
+        else if (parking_scenario == 2)
+        {
+            if (parking_case == 0)
+            {
+                x0 = -6.0;
+                y0 = -2.0;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 1)
+            {
+                x0 = 1.0;
+                y0 = -2.0;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 2)
+            {
+                x0 = -3.0;
+                y0 = -2.0;
+                theta0 = pi - 0.0001;
+            }
+        }
+        else if (parking_scenario == 3)
+        {
+            if (parking_case == 0)
+            {
+                x0 = -5.0;
+                y0 = 7.5;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 1)
+            {
+                x0 = -5.0;
+                y0 = 5.0;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 2)
+            {
+                x0 = -1.0;
+                y0 = 6.0;
+                theta0 = pi - 0.0001;
+            }
+        }
+    }
+    else
+    {
+        if (parking_scenario == 0)
+        {
+            if (parking_case == 0)
+            {
+                x0 = -6.0;
+                y0 = -2.75;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 1)
+            {
+                x0 = 0.0;
+                y0 = -2.75;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 2)
+            {
+                x0 = 0.0;
+                y0 = -2.75;
+                theta0 = pi - 0.0001;
+            }
+        }
+        else if (parking_scenario == 1)
+        {
+            if (parking_case == 0)
+            {
+                x0 = -6.0;
+                y0 = -2.0;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 1)
+            {
+                x0 = -8.0;
+                y0 = 0.0;
+                theta0 = -pi / 6.0;
+            }
+            else if (parking_case == 2)
+            {
+                x0 = -4.0;
+                y0 = -3.0;
+                theta0 = -pi / 5.0;
+            }
+        }
+        else if (parking_scenario == 2)
+        {
+            if (parking_case == 0)
+            {
+                x0 = -6.0;
+                y0 = -2.0;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 1)
+            {
+                x0 = 1.0;
+                y0 = -2.0;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 2)
+            {
+                x0 = -3.0;
+                y0 = -2.0;
+                theta0 = pi - 0.0001;
+            }
+        }
+        else if (parking_scenario == 3)
+        {
+            if (parking_case == 0)
+            {
+                x0 = -5.0;
+                y0 = 7.5;
+                theta0 = 0.0;
+            }
+            else if (parking_case == 1)
+            {
+                x0 = -5.0;
+                y0 = 5.0;
+                theta0 = -pi / 18.0;
+            }
+            else if (parking_case == 2)
+            {
+                x0 = -1.0;
+                y0 = 6.0;
+                theta0 = 0.0;
+            }
+        }
+    }
+
+    base::ScopedState<base::SE2StateSpace> start(setup.getSpaceInformation());
+    start->setX(x0);
+    start->setY(y0);
+    start->setYaw(theta0);
+
+    // define goal state
+    double xmiddle = 3.0;
+    double ymiddle = 1.25;
+    double delta = 1.4155;
+    if (parking_forward) delta = -delta;
+    if (parking_scenario == 0)
+        xmiddle = 2.82 + delta;
+    else if (parking_scenario == 1)
+        xmiddle = 2.82 + delta;
+    if (parking_scenario == 2)
+    {
+        xmiddle = 1.25;
+        ymiddle = 3.0 + delta;
+    }
+    else if (parking_scenario == 3)
+        xmiddle = 3.0 + delta;
+
+    base::ScopedState<base::SE2StateSpace> goal(start);
+    goal->setX(xmiddle);
+    goal->setY(ymiddle);
+    goal->setYaw(0.0);
+    if (parking_scenario == 2)
+      goal->setYaw(0.5 * pi);
+
+    setup.setStartAndGoalStates(start, goal);
+}
+
+void setCost(double & cost, bool parking_forward, int parking_scenario, int parking_case)
+{
+    if (parking_forward)
+    {
+        if (parking_scenario == 0)
+        {
+            if (parking_case == 0)
+            {
+                cost = 25.0;
+            }
+            else if (parking_case == 1)
+            {
+                cost = 20.0;
+            }
+            else if (parking_case == 2)
+            {
+                 cost = 20.0;
+            }
+        }
+        else if (parking_scenario == 1)
+        {
+            if (parking_case == 0)
+            {
+                 cost = 20.0;
+            }
+            else if (parking_case == 1)
+            {
+                 cost = 25.0;
+            }
+            else if (parking_case == 2)
+            {
+                 cost = 20.0;
+            }
+        }
+        else if (parking_scenario == 2)
+        {
+            if (parking_case == 0)
+            {
+                 cost = 25.0;
+            }
+            else if (parking_case == 1)
+            {
+                 cost = 25.0;
+            }
+            else if (parking_case == 2)
+            {
+                 cost = 25.0;
+            }
+        }
+        else if (parking_scenario == 3)
+        {
+            if (parking_case == 0)
+            {
+                 cost = 25.0;
+            }
+            else if (parking_case == 1)
+            {
+                 cost = 25.0;
+            }
+            else if (parking_case == 2)
+            {
+                 cost = 25.0;
+            }
+        }
+    }
+}
+
+class APCallback : public b2NaiveCallback
+{
+public:
+    APCallback(double minDist, const b2RectangleShape * rect, const b2OBB * obb) : b2NaiveCallback()
+    {
+        minDist_ = minDist;
+
+        rect_ = rect;
+        hsides_= rect_->GetHalfSides();
+
+        xf_.setIdentity();
+        xf_.linear() = obb->axis();
+        xf_.translation() = obb->center();
+
+        invxf_.setIdentity();
+        invxf_.linear() = obb->axis().transpose();
+        invxf_.translation() = -invxf_.linear() * obb->center();
+    }
+
+    ~APCallback() override = default;
+
+    bool ReportCollision(b2Fixture* fixture) override
+    {
+        if (!fixture->GetBody()->IsActive())
+        {
+            b2Scalar d;
+            b2Vec2 p1, p2;
+            dist_.SignedDistance(rect_, fixture->GetShape(), invxf_ * fixture->GetGlobalTransform(), &d, &p1, &p2);
+            b2Vec2 normal = p2 - p1;
+            p2 = xf_ * p2;
+            if (d < minDist_) minDist_ = d;
+
+            // without principal normal
+            if (abs(normal(0)) < 2.0 * abs(normal(1)) && abs(normal(1)) < 2.0 * abs(normal(0)))
+                return false;
+
+            psopt::ActivePoint<double> apoint;
+            apoint.Ba.push_back(p2);
+            if (abs(normal(0)) >= abs(normal(1)))
+            {
+                if (normal(0) > 0.0)
+                {
+                    apoint.Aa.push_back(b2Vec2(hsides_[0], -hsides_[1]));
+                    apoint.Aa.push_back(b2Vec2(hsides_[0], hsides_[1]));
+                }
+                else
+                {
+                    apoint.Aa.push_back(b2Vec2(-hsides_[0], hsides_[1]));
+                    apoint.Aa.push_back(b2Vec2(-hsides_[0], -hsides_[1]));
+                }
+            }
+            else if (normal(1) > 0.0)
+            {
+                apoint.Aa.push_back(b2Vec2(hsides_[0], hsides_[1]));
+                apoint.Aa.push_back(b2Vec2(-hsides_[0], hsides_[1]));
+            }
+            else
+            {
+                apoint.Aa.push_back(b2Vec2(-hsides_[0], -hsides_[1]));
+                apoint.Aa.push_back(b2Vec2(hsides_[0], -hsides_[1]));
+            }
+            activePoints_.push_back(apoint);
+        }
+        return false; // Never stop early
+    }
+
+    double getMinDist() const
+    {
+        return minDist_;
+    }
+
+    std::vector<psopt::ActivePoint<double>> & getActivePoints()
+    {
+        return activePoints_;
+    }
+
+private:
+
+    double minDist_;
+
+    // Distance Calculation
+    b2ShapeDistance dist_;
+
+    // Local vehicle rectangle
+    const b2RectangleShape* rect_;
+    b2Vec2 hsides_;
+
+    // Vehicle Global Transform
+    b2Transform xf_, invxf_;
+
+    std::vector<psopt::ActivePoint<double>> activePoints_;
+};
+
+template <typename Scalar = double, typename Scalar2 = Scalar>
+class FourScenariosProblemJ2 : public FourScenariosProblemBase<Scalar, Scalar2>
+{
+public:
+
+    FourScenariosProblemJ2(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, bool forward = true) : FourScenariosProblemBase<Scalar, Scalar2>(prob, vehicleParam, forward)
+    {
+    }
+
+    virtual ~FourScenariosProblemJ2() = default;
+
+    psopt::Problem<adouble, Scalar2>* clone() const override
+    {
+        FourScenariosProblemJ2<adouble, Scalar2>* prob = new FourScenariosProblemJ2<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_);
+        prob->setActive(active_);
+        prob->setPathWeights(pathWeights_);
+        prob->setActivePoints(activePoints_);
+        prob->setActiveTrajx(activeTrajx_);
+        prob->setActiveTrajy(activeTrajy_);
+        prob->setActiveTrajt(activeTrajt_);
+        return prob;
+    }
+
+    void setActive(bool value)
+    {
+        active_ = value;
+    }
+
+    void setPathWeights(const std::vector<Scalar2> & pathWeights)
+    {
+        pathWeights_ = pathWeights;
+    }
+
+    void setActivePoints(const std::vector<psopt::ActivePoints<Scalar2>> & activePoints)
+    {
+        activePoints_ = activePoints;
+    }
+
+    void setActiveTrajx(const std::vector<Scalar2> & activeTrajx)
+    {
+        activeTrajx_ = activeTrajx; 
+    }
+
+    void setActiveTrajy(const std::vector<Scalar2> & activeTrajy)
+    {
+        activeTrajy_ = activeTrajy; 
+    }
+
+    void setActiveTrajt(const std::vector<Scalar2> & activeTrajt)
+    {
+        activeTrajt_ = activeTrajt; 
+    }
+
+    Scalar endpointCost(const Scalar* initial_states, const Scalar* /*final_states*/,
+        const Scalar* /*parameters*/, const Scalar& t0, const Scalar& tf,
+        const Scalar* /*xad*/, std::size_t iphase) const override
+    {
+        Scalar res = 100.0 * (tf - t0);
+        if (!active_) return res;
+
+        //const std::vector<Scalar2> & activeTrajx = activeTrajx_[iphase];
+        //const std::vector<Scalar2> & activeTrajy = activeTrajy_[iphase];
+        std::size_t nnodes = this->problemInfo_->getPhaseNumberNodes(iphase);
+        std::size_t nstates = this->problemInfo_->getPhaseNumberStates(iphase);
+        const Scalar* states = initial_states;
+        for (std::size_t i = 0; i < nnodes; i++)
+        {
+            Scalar dist = (states[0] - activeTrajx_[i]) * (states[0] - activeTrajx_[i]) + (states[1] - activeTrajy_[i]) * (states[1] - activeTrajy_[i]);
+            dist += 2.0 * (states[2] - activeTrajt_[i]) * (states[2] - activeTrajt_[i]);
+            res += pathWeights_[i] * dist;
+            states += nstates;
+        }
+        return res;
+    }
+
+    void pathAlongTrajectory(Scalar* /*paths*/, const Scalar* /*states*/,
+        const Scalar* /*controls*/, const Scalar* /*parameters*/, const Scalar& /*time*/, const Scalar* /*xad*/, std::size_t /*iphase*/) const override
+    {
+        /*
+        if (obstacles.empty()) return;
+        const Scalar& x = states[0];
+        const Scalar& y = states[1];
+        const Scalar& theta = states[2];
+
+        // rectangle obstacles
+        Eigen::Matrix<Scalar, 2, 3> invtransform = invtransform_2D(x, y, theta);
+        if (this->forward_)
+            invtransform(0, 2) -= this->vehicleParam_->delta;
+        else
+            invtransform(0, 2) += this->vehicleParam_->delta;
+        Eigen::Matrix<Scalar2, 3, 4> rect2 = Eigen::Matrix<Scalar2, 3, 4>::Ones();
+        for (std::size_t i = 0; i < obstacles.size(); i++)
+        {
+            rect2.topRows(2) = obstacles[i];
+            psopt::rectangle_rectangle_MJ_2_KKT_Norm(paths + 6 * i, parameters + 19 * i, (rect1.template cast<Scalar>()).eval(), (invtransform * rect2.template cast<Scalar>()).eval());
+        }
+        */
+    }
+
+    void path(Scalar* paths, const Scalar* states, const Scalar* parameters,
+        const Scalar* /*x*/, std::size_t iphase) const override
+    {
+        std::size_t offset = 0;
+        std::size_t nstates = this->problemInfo_->getPhaseNumberStates(iphase);
+        for (const psopt::ActivePoints<Scalar2> & apoints : activePoints_)
+        {
+            const Scalar * cstates = states + apoints.index * nstates;
+            const Scalar x = cstates[0];
+            const Scalar y = cstates[1];
+            const Scalar theta = cstates[2];
+            Eigen::Matrix<Scalar, 2, 3> invtransform = invtransform_2D(x, y, theta);
+            if (this->forward_)
+                invtransform(0, 2) -= this->vehicleParam_->delta;
+            else
+                invtransform(0, 2) += this->vehicleParam_->delta;
+            MJ_2_Active_Constraints(paths + 4 * offset, parameters + 3 * offset, invtransform, apoints.activePoints);
+            offset += apoints.activePoints.size();
+        }
+    }
+
+private:
+
+    bool active_{false};
+
+    std::vector<Scalar2> pathWeights_;
+
+    std::vector<psopt::ActivePoints<Scalar2>> activePoints_;
+
+    std::vector<Scalar2> activeTrajx_, activeTrajy_, activeTrajt_;
+};
+
+int main(int argc, char* argv[])
+{
+    // The parsed arguments
+    bool optimal;
+    bool parking_forward;
+    int parking_scenario;
+    int parking_case;
+    double runTime;
+    double checkResolution;
+    PlannerType plannerType;
+    std::string env;
+    std::string spaceType;
+    std::size_t expected_nnodes = 20; 
+    // Parse the arguments
+    if (!argParse(argc, argv, runTime, plannerType, optimal, env, spaceType, checkResolution, parking_forward, parking_scenario, parking_case, expected_nnodes)) return -1;
+
+    ob::StateSpacePtr space;
+    ob::RealVectorBounds bounds(2);
+    setBounds(parking_scenario, bounds);
+    if (spaceType == "SE2")
+    {
+        auto space1(std::make_shared<ob::SE2StateSpace>());
+        space1->setBounds(bounds);
+        space = space1;
+    }
+    else if (spaceType == "Dubins")
+    {
+        auto space1(std::make_shared<ob::DubinsStateSpace>(4.5, false));
+        space1->setBounds(bounds);
+        space = space1;
+    }
+    else if (spaceType == "ReedsShepp")
+    {
+        auto space1(std::make_shared<ob::ReedsSheppStateSpace>(4.5));
+        space1->setBounds(bounds);
+        space = space1;
+    }
+
+    auto si(std::make_shared<ob::SpaceInformation>(space));
+    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, app::Motion_2D, space, getState);
+    svc->setEnvironmentFile(std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
+    if (parking_forward)
+        svc->addRobotShape(std::string(OMPLAPP_RESOURCE_DIR) + "/parking_vehicle_forward.ply");
+    else
+        svc->addRobotShape(std::string(OMPLAPP_RESOURCE_DIR) + "/parking_vehicle_reverse.ply");
+
+    si->setStateValidityChecker(svc);
+    si->setStateValidityCheckingResolution(checkResolution);
+    si->setup();
+
+    // start state
+    double x0, y0, theta0;
+    ompl::geometric::SimpleSetup setup(si);
+    setStartAndGoal(setup, x0, y0, theta0, parking_forward, parking_scenario, parking_case);
+
+    // objective
+    if (optimal)
+    {
+        double cost = 0.0;
+        setCost(cost, parking_forward, parking_scenario, parking_case);
+        auto obj(std::make_shared<ob::PathLengthOptimizationObjective>(setup.getSpaceInformation()));
+        obj->setCostThreshold(base::Cost(cost));
+        setup.setOptimizationObjective(obj);
+    }
+
+    // Construct the optimal planner specified by our command line argument.
+    // This helper function is simply a switch statement.
+    ob::PlannerPtr planner = allocatePlanner(si, plannerType);
+    setup.setPlanner(planner);
+
+    setup.setup();
+    if (setup.solve(runTime) == ob::PlannerStatus::EXACT_SOLUTION)
+    {
+        setup.simplifySolution();
+        og::PathGeometric &p = setup.getSolutionPath();
+        p.interpolate();
+        if (p.getStateCount() < expected_nnodes) p.interpolate(expected_nnodes);
+        std::ofstream ofs("pathsol.txt");
+        p.printAsMatrix(ofs);
+        ofs.close();
+
+        base::PlannerData pd(si);
+        setup.getPlannerData(pd);
+        base::PlannerDataStorage pds;
+        pds.store(pd, "pdsol.txt");
+
+        std::cout << "*** Active Phase!" << std::endl;
+
+        // extract expected_nnodes states 
+        std::size_t nmod = p.getStateCount() / expected_nnodes;
+        std::vector<double> trajx, trajy, trajt;
+        for (std::size_t i = 0;; i+=nmod)
+        {
+            if (i >= p.getStateCount())
+            {
+                if (i < p.getStateCount() + nmod - 1) i = p.getStateCount() - 1;
+                else break;
+            }
+            const auto* se2state = p.getState(i)->as<ob::SE2StateSpace::StateType>();
+            trajx.push_back(se2state->getX());
+            trajy.push_back(se2state->getY());
+            trajt.push_back(se2state->getYaw());
+        }
+        expected_nnodes = trajx.size();
+
+        // basic problem definition
+        psopt::MultiSegmentData msdata;
+        msdata.nsegments = 1;
+        msdata.nstates = 4;
+        msdata.ncontrols = 2;
+        msdata.nparameters = 0;
+        msdata.ninitial_events = 4;
+        msdata.nfinal_events = 4;
+        msdata.npaths = 0;
+        msdata.parameters_along_trajectory = false;
+        msdata.continuous_controls = false;
+        if (msdata.nsegments == 2) // TODO
+        {
+            msdata.nnodes.push_back(15);
+            msdata.nnodes.push_back(15);
+        }
+        else
+            msdata.nnodes.push_back(expected_nnodes);
+        psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+        info->setLinearSolver("ma57");
+        info->setTolerance(1.e-8);
+
+        // interpolated states
+        info->setupPScore();
+        Eigen::VectorXd etime = Eigen::VectorXd::LinSpaced(expected_nnodes, -1.0, 1.0);
+        std::vector<double> vtime(etime.data(), etime.data() + expected_nnodes);
+        std::vector<double> ptime = info->getNodes(expected_nnodes - 1);
+        psopt::LinearInterpolation<double, double> linearInterp(vtime, ptime);
+        std::vector<double> interp_trajx = linearInterp.interpolate(trajx);
+        std::vector<double> interp_trajy = linearInterp.interpolate(trajy);
+        std::vector<double> interp_trajt = linearInterp.interpolate(trajt);
+        ofs.open("pathsol_interp.txt"); // TODO delete
+        for (std::size_t i = 0; i < expected_nnodes; i++)
+        {
+            ofs << interp_trajx[i] << " " << interp_trajy[i] << " " << interp_trajt[i] << std::endl;
+        }
+        ofs.close();
+
+        // vehicle param
+        VehicleParam<double> *vehicleParam = new VehicleParam<double>(2.8, 0.96, 0.929, 1.942);
+        double delta = vehicleParam->delta;
+        if (!parking_forward) delta = -delta;
+
+        // local vehicle rectangle
+        b2RectangleShape * rect = new b2RectangleShape(0.5 * vehicleParam->L, 0.5 * vehicleParam->W);
+
+        // obb extent
+        double active_dist = 0.5;
+        b2Vec2 extent(0.5 * vehicleParam->L + active_dist, 0.5 * vehicleParam->W + active_dist);
+
+        // get active points
+        std::size_t nactive = 0;
+        // if the robot is far away from obstacles, set a large path weight
+        double wo_weight = 10.0;
+        std::vector<double> pathWeights;
+        std::vector<psopt::ActivePoints<double>> activePoints; 
+        pathWeights.reserve(expected_nnodes);
+        activePoints.reserve(expected_nnodes);
+        std::ofstream ofs1;
+        ofs.open("active_points_0.txt");
+        ofs1.open("active_points_1.txt");
+        for (std::size_t i = 0; i < expected_nnodes; i++)
+        {
+            double x = interp_trajx[i];
+            double y = interp_trajy[i];
+            double yaw = interp_trajt[i];
+
+            b2Mat22 axis = b2Rot(yaw).toRotationMatrix();
+            b2Vec2 center(x, y);
+            center += delta * axis.col(0); // local vehicle center
+            b2OBB obb(axis, center, extent);
+            APCallback callback(active_dist, rect, &obb);
+            svc->getBox2dDiscreteBVHManager()->getBox2dBroadphse()->Collide(&callback, obb);
+            if (callback.getMinDist() >= active_dist) pathWeights.push_back(wo_weight);
+            else pathWeights.push_back(std::exp(callback.getMinDist()));
+            if (callback.getActivePoints().empty()) continue;
+
+            bool first = true;
+            for (const psopt::ActivePoint<double> & apoint : callback.getActivePoints())
+            {
+                for (const Eigen::Matrix<double, 2, 1> & p : apoint.Aa)
+                {
+                    Eigen::Matrix<double, 2, 1> wp = axis * p + center;
+                    if (first) ofs << wp(0) << " " << wp(1) << std::endl;
+                    else ofs1 << wp(0) << " " << wp(1) << std::endl;
+                }
+                for (const Eigen::Matrix<double, 2, 1> & p : apoint.Ba)
+                {
+                    if (first) ofs << p(0) << " " << p(1) << std::endl;
+                    else ofs1 << p(0) << " " << p(1) << std::endl;
+                }
+                first = false;
+            }
+
+            psopt::ActivePoints<double> apoints; 
+            apoints.index = i;
+            apoints.activePoints.swap(callback.getActivePoints());
+            activePoints.push_back(apoints);
+            nactive += apoints.activePoints.size();
+        }
+        std::cout << "Number Active Constraints " << nactive << std::endl;
+        ofs.close();
+        ofs1.close();
+
+        four_scenarios_bounds(info, x0, y0, theta0);
+        info->setPhaseLowerBoundStartTime(0.0);
+        info->setPhaseUpperBoundStartTime(0.0);
+        info->setPhaseLowerBoundEndTime(2.0);
+        info->setPhaseUpperBoundEndTime(50.0);
+        for (std::size_t i = 0; i < msdata.nsegments - 1; i++)
+        {
+            info->setPhaseLowerBoundStartTime(2.0, 1);
+            info->setPhaseUpperBoundStartTime(50.0, 1);
+            info->setPhaseLowerBoundEndTime(2.0, 1);
+            info->setPhaseUpperBoundEndTime(50.0, 1);
+        }
+        four_scenarios_guess(info, x0, y0, theta0);
+
+        // active parameters and paths
+        double Jeps = 0.05;
+        info->setPathsAlongTrajectory(false);
+        info->setParametersAlongTrajectory(false);
+        /*
+        info->setPhaseNumberParameters(3 * nactive); // TODO
+        info->setPhaseNumberPaths(4 * nactive);
+        bounds_MJ_2_Active(info, nactive, Jeps);
+        info->setPhaseConstantGuessParameters(1.0);
+        */
+
+        // initial guess states
+        std::vector<double> guess_states;
+        guess_states.reserve(msdata.nstates * msdata.nnodes[0]);
+        for (std::size_t i = 0; i < msdata.nnodes[0]; i++)
+        {
+            guess_states.push_back(interp_trajx[i]);
+            guess_states.push_back(interp_trajy[i]);
+            guess_states.push_back(interp_trajt[i]);
+            for (std::size_t j = 3; j < msdata.nstates; j++)
+                guess_states.push_back(0.0);
+        }
+        info->setPhaseGuessStates(guess_states);
+
+        FourScenariosProblemJ2<double>* problem = new FourScenariosProblemJ2<double>(info, vehicleParam, parking_forward);
+        problem->setActive(true);
+        problem->setPathWeights(pathWeights);
+        //problem->setActivePoints(activePoints); // TODO
+        problem->setActiveTrajx(interp_trajx);
+        problem->setActiveTrajy(interp_trajy);
+        problem->setActiveTrajt(interp_trajt);
+
+        psopt::Solver<double> solver;
+        if (solver.solve(problem))
+        {
+            std::ofstream ofs;
+            ofs.open("states.txt");
+            const std::vector<double> & states = solver.getPhaseStates();
+            for (std::size_t j = 0; j < msdata.nnodes[0]; j++)
+            {
+                std::size_t offset = j * msdata.nstates;
+                for (std::size_t i = 0; i < msdata.nstates; i++)
+                {
+                    ofs << states[offset + i] << " ";
+                }
+                ofs << std::endl;
+            }
+            ofs.close();
+
+            ofs.open("controls.txt");
+            for (std::size_t i = 0; i < msdata.ncontrols; i++)
+            {
+                for (std::size_t j = 0; j < msdata.nsegments; j++)
+                {
+                    std::vector<double> traj = solver.getPhaseTrajectoryControls(msdata.ncontrols, msdata.nnodes[j], i, j);
+                    if (j > 0) traj.erase(traj.begin());
+                    for (double data : traj) ofs << data << " ";
+                }
+                ofs << std::endl;
+            }
+            ofs.close();
+
+            ofs.open("time.txt");
+            for (std::size_t j = 0; j < msdata.nsegments; j++)
+            {
+                std::vector<double> traj = solver.getPhaseTime(j);
+                if (j > 0) traj.erase(traj.begin());
+                for (double data : traj) ofs << data << " ";
+            }
+            ofs.close();
+        }
+
+        delete rect;
+        delete info;
+        delete vehicleParam;
+        delete problem;
+        rect = nullptr;
+        info = nullptr;
+        vehicleParam = nullptr;
+        problem = nullptr;
+    }
+
+    return 0;
+}
+
+bool argParse(int argc, char** argv, double &runTime, PlannerType &planner, bool &optimal, std::string &env,
+        std::string &spaceType, double &checkResolution, bool & parking_forward, int & parking_scenario, int & parking_case, std::size_t & expected_nnodes)
+{
+    namespace bpo = boost::program_options;
+
+    // Declare the supported options.
+    bpo::options_description desc("Allowed options");
+    desc.add_options()
+        ("help,h", "produce help message")
+        ("env,e", bpo::value<std::string>()->default_value("parking_scenario_0.ply"), "(Optional) Specify the polygon and circle environment, defaults to parking_scenario_0.ply if not given.")
+        ("runtime,t", bpo::value<double>()->default_value(1.0), "(Optional) Specify the runtime in seconds. Defaults to 1 and must be greater than 0.")
+        ("planner,p", bpo::value<std::string>()->default_value("RRT"), "(Optional) Specify the optimal planner to use, defaults to RRT if not given. Valid options are RRT, RRTConnect, BiASE, RRTstar, InformedRRTstar, BITstar, BiASEstar.")
+        ("spacetype,s", bpo::value<std::string>()->default_value("SE2"), "(Optional) Specify the planning space type, default to RealVector2 if not given. Valid options are RealVector2, SE2, Dubins, ReedsShepp.")
+        ("checkResolution", bpo::value<double>()->default_value(0.01), "(Optional) Specify the collision checking resolution. Defaults to 0.01 and must be greater than 0.")
+        ("parking_forward", bpo::value<bool>()->default_value(true), "(Optional) Specify if forward parking, default to true if not given")
+        ("parking_scenario", bpo::value<int>()->default_value(0), "(Optional) Specify the parking scenario, default to 0 if not given. Valid options are 0, 1, 2, 3")
+        ("parking_case", bpo::value<int>()->default_value(0), "(Optional) Specify the parking case, default to 0 if not given. Valid options are 0, 1, 2")
+        ("expected_nnodes", bpo::value<std::size_t>()->default_value(20), "(Optional) Specify the discrete nnodes");
+    bpo::variables_map vm;
+    bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
+    bpo::notify(vm);
+    // Check if the help flag has been given:
+    if (vm.count("help") != 0u)
+    {
+        std::cout << desc << std::endl;
+        return false;
+    }
+
+    // Get the runtime as a double
+    runTime = vm["runtime"].as<double>();
+    // Sanity check
+    if (runTime <= 0.0)
+    {
+        std::cout << "Invalid runtime." << std::endl << std::endl << desc << std::endl;
+        return false;
+    }
+
+    env = vm["env"].as<std::string>();
+
+    // Get the specified planner as a string
+    std::string plannerStr = vm["planner"].as<std::string>();
+    optimal = false;
+    // Map the string to the enum
+    if (boost::iequals("RRT", plannerStr))
+    {
+        planner = PLANNER_RRT;
+    }
+    else if (boost::iequals("RRTConnect", plannerStr))
+    {
+        planner = PLANNER_RRTCONNECT;
+    }
+    else if (boost::iequals("BiASE", plannerStr))
+    {
+        planner = PLANNER_BIASE;
+    }
+    else if (boost::iequals("RRTstar", plannerStr))
+    {
+        optimal = true;
+        planner = PLANNER_RRTSTAR;
+    }
+    else if (boost::iequals("InformedRRTstar", plannerStr))
+    {
+        optimal = true;
+        planner = PLANNER_INF_RRTSTAR;
+    }
+    else if (boost::iequals("BITstar", plannerStr))
+    {
+        optimal = true;
+        planner = PLANNER_BITSTAR;
+    }
+    else if (boost::iequals("BiASEstar", plannerStr))
+    {
+        optimal = true;
+        planner = PLANNER_BIASESTAR;
+    }
+    else
+    {
+        std::cout << "Invalid planner string." << std::endl << std::endl << desc << std::endl;
+        return false;
+    }
+
+    spaceType = vm["spacetype"].as<std::string>();
+    if (boost::iequals("SE2", spaceType))
+    {
+        spaceType = "SE2";
+    }
+    else if (boost::iequals("Dubins", spaceType))
+    {
+        spaceType = "Dubins";
+    }
+    else if (boost::iequals("ReedsShepp", spaceType))
+    {
+        spaceType = "ReedsShepp";
+    }
+
+    checkResolution = vm["checkResolution"].as<double>();
+    parking_forward = vm["parking_forward"].as<bool>();
+    parking_scenario = vm["parking_scenario"].as<int>();
+    parking_case = vm["parking_case"].as<int>();
+    expected_nnodes = vm["expected_nnodes"].as<std::size_t>();
+    
+    return true;
+}

@@ -141,7 +141,10 @@ namespace ompl
 
         protected:
 
-            virtual const base::State* getGeometricComponentStateInternal(const base::State* state, unsigned int index) const = 0;
+            virtual const base::State* getGeometricComponentStateInternal(const base::State* state, unsigned int index) const
+            {
+                return defaultGeometricStateExtractor(state, index);
+            }
 
             std::string name_;
 

@@ -49,39 +49,6 @@ from descartes import PolygonPatch as SPolygonPatch
 
 from math import cos, sin, sqrt
 
-def setup(axs):
-    xlim = axs.get_xlim()
-    ylim = axs.get_ylim()
-
-    #axs.spines["top"].set_visible(False)
-    #axs.spines["right"].set_visible(False)
-
-    lw = 0.5
-    axs.spines.left.set_linewidth(lw)
-    axs.spines.right.set_linewidth(lw)
-    axs.spines.top.set_linewidth(lw)
-    axs.spines.bottom.set_linewidth(lw)
-
-    axs.spines["left"].set_position(("data", xlim[0]))
-    axs.spines['left'].set_bounds(ylim[0], ylim[1])
-    axs.spines['right'].set_bounds(ylim[0], ylim[1])
-
-    axs.spines["bottom"].set_position(("data", ylim[0]))
-    axs.spines['bottom'].set_bounds(xlim[0], xlim[1])
-    axs.spines['top'].set_bounds(xlim[0], xlim[1])
-
-    axs.xaxis.set_ticks_position('bottom')
-    axs.xaxis.set_tick_params(which='major', direction = 'in', width=1.00, length=3)
-    #axs.xaxis.set_major_formatter(ticker.StrMethodFormatter("{x} s"))
-
-    axs.yaxis.set_ticks_position('left')
-    axs.yaxis.set_tick_params(which='major', direction = 'in', width=1.00, length=3)
-
-    axs.yaxis.grid(True, linestyle=(0, (5, 5)), lw = 1, which='major', color='darkgrey', alpha=1.0)
-
-    axs.set_xlim(xlim)
-    axs.set_ylim(ylim)
-
 if __name__ == "__main__":
     # Create an argument parser
     parser = argparse.ArgumentParser(description='Draw scenario.')

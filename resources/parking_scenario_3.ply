@@ -1,0 +1,9 @@
+# Random 2D scenarios with circle, polygon, ellipse, capsule and rectangle shapes
+# (feel free to add / change comments, but leave the first line as it is!)
+#
+numbers 4
+shapes
+4 -4.42899221 2.01430776 0.34906585 2.3445 0.971
+4 7.97184443 1.25084471 0.698131701 2.3445 0.971
+4 2.33133933 6.11589656 1.047197551 2.3445 0.971
+4 0.89210516 -1.35303237 -0.052359878 2.3445 0.971

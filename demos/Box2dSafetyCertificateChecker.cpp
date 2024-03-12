@@ -287,7 +287,7 @@ int main(int argc, char* argv[])
     } 
 
     auto si(std::make_shared<ob::SpaceInformation>(space));
-    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, app::Motion_2D, gspace,
+    auto svc = std::make_shared<app::Box2dStateValidityChecker>(si, gspace,
                 robot == 1 ? getGeometricComponentStateInternal : getGeometricComponentStateInternal2);
     svc->setEnvironmentFile(std::string(OMPLAPP_RESOURCE_DIR) + "/" + env);
 

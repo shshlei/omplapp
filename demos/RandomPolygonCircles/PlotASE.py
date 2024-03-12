@@ -115,7 +115,7 @@ if __name__ == "__main__":
         invert_yaxis = True
         plt.switch_backend("cairo")
 
-    fig, ax = plt.subplots(figsize=(1.8, 1.8))
+    fig, ax = plt.subplots(figsize=(2.5, 2.5))
     colors = prop_cycle.by_key()['color'] #['#4C72B0', '#55A868', '#C44E52', '#8172B2', '#CCB974', '#64B5CD']
     #colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
     #['#26b9ce', '#7f3b71', '#2a3377', '#9fa0a0', '#85878b', '#73cdc9', '#afceff', '#ffafaf']
@@ -738,7 +738,7 @@ if __name__ == "__main__":
         gt.graph_draw(graph, pos=pos, vertex_shape=shapeprops, vertex_size=0.02025, vertex_fill_color=colorprops2, vertex_pen_width=0.001,
                       edge_pen_width=0.005, edge_color=edgecolor2, edge_end_marker='none', mplfig=ax)
 
-    if False:
+    if True:
         """start goal"""
         if invert_yaxis:
             ax.scatter(0.05, -0.05, color='green', s=12, zorder=10)
@@ -760,6 +760,7 @@ if __name__ == "__main__":
     ax.set_aspect('equal')
     #setup(ax)
     plt.tight_layout()
-    plt.savefig('random_scenarios.pdf')
+    plt.savefig('random_scenarios.svg')
+    # plt.savefig('random_scenarios.pdf')
     if not invert_yaxis:
         plt.show()

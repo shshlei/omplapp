@@ -36,8 +36,8 @@
 
 #include <ompl/util/RandomNumbers.h>
 #include <box2d_collision/b2_bvh_manager.h>
-#include <boost/math/constants/constants.hpp>
 
+#include <boost/math/constants/constants.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
@@ -71,7 +71,7 @@ public:
         return false; // Never stop early
     }
 
-    std::set<std::string> getCollisionBodies() const 
+    const std::set<std::string> & getCollisionBodies() const 
     {
         return collisionBodies_;
     }
@@ -104,7 +104,6 @@ int main(int argc, char* argv[])
     // H5::H5F_ACC_TRUNC : create a new file or overwrite an existing file.
     H5File label_file((save_dir + "hybrid_" + shape1 + "_" + shape2 + "_" + "collision_labels.hdf5").c_str(), H5F_ACC_TRUNC);
     std::vector<double> labels; 
-    // std::ofstream ofs("data/ellipses_test.txt", std::ios::binary | std::ios::out);
 
     int valid = 0, invalid = 0;
     int diff = std::floor(0.05 * objects * points);
@@ -165,7 +164,7 @@ int main(int argc, char* argv[])
                 flist = flist->GetNext();
             }
 
-            std::set<std::string> collisions = callback.getCollisionBodies();
+            const std::set<std::string> & collisions = callback.getCollisionBodies();
             for (auto & name : collisions)
                 manager.RemoveBody(name);
 
@@ -186,7 +185,6 @@ int main(int argc, char* argv[])
             if (shape->GetType() == b2Shape::e_circle)
             {
                 const b2CircleShape *cshape = static_cast<const b2CircleShape *>(shape);
-                // ofs << static_cast<double>(xf.translation().x()) << " " << static_cast<double>(xf.translation().y()) << " " << static_cast<double>(cshape->GetRadius()) << std::endl; 
                 circles.push_back(static_cast<double>(xf.translation().x()));
                 circles.push_back(static_cast<double>(xf.translation().y()));
                 circles.push_back(static_cast<double>(cshape->GetRadius()));
@@ -526,6 +524,7 @@ bool argParse(int argc, char** argv, std::string &save_dir, std::size_t &objects
         ("save_dir", bpo::value<std::string>()->default_value("data"), "The save dir")
         ("objects", bpo::value<std::size_t>()->default_value(1000), "Objects number")
         ("points", bpo::value<std::size_t>()->default_value(1000), "Points number")
+        //("bilinear", bpo::value<bool>()->default_value(false), "Bilinear Model")
         ("expect_obstacles", bpo::value<std::size_t>()->default_value(1000), "Specify the expected obstacles number in each scenario")
         ("shape1", bpo::value<std::string>()->default_value("ellipse"), "The first shape type")
         ("shape2", bpo::value<std::string>()->default_value("ellipse"), "The second shape type");
@@ -545,6 +544,7 @@ bool argParse(int argc, char** argv, std::string &save_dir, std::size_t &objects
         save_dir += "/";
     objects = vm["objects"].as<std::size_t>();
     points = vm["points"].as<std::size_t>();
+    //bilinear = vm["bilinear"].as<bool>();
     expect_obstacles = vm["expect_obstacles"].as<std::size_t>();
     shape1 = vm["shape1"].as<std::string>();
     shape2 = vm["shape2"].as<std::string>();

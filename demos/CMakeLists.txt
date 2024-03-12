@@ -13,6 +13,9 @@ if (OMPL_BUILD_DEMOS)
         ${Boost_PROGRAM_OPTIONS_LIBRARY})
     endmacro(add_omplapp_demo)
 
+    add_omplapp_demo(demo_CurvesCarPlanning CarControl/CurvesCarPlanning.cpp)
+    add_omplapp_demo(demo_KinematicCarPlanning CarControl/KinematicCarPlanning.cpp CarControl/KinematicCarSetup.cpp)
+
 #    add_omplapp_demo(demo_SE3RigidBodyPlanningBenchmark SE3RigidBodyPlanning/SE3RigidBodyPlanningBenchmark.cpp)
 #    add_omplapp_demo(demo_SE3RigidBodyPlanning SE3RigidBodyPlanning/SE3RigidBodyPlanning.cpp)
 #    add_omplapp_demo(demo_SE3RigidBodyPlanningWithOptimization SE3RigidBodyPlanning/SE3RigidBodyPlanningWithOptimization.cpp)
@@ -26,12 +29,75 @@ if (OMPL_BUILD_DEMOS)
 #    add_omplapp_demo(demo_CollisionCheckers SE3RigidBodyPlanning/CollisionCheckers.cpp)
 #    add_omplapp_demo(demo_AnytimePathShortening AnytimePathShorteningDemo.cpp)
 
+    find_package(adolc REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ipopt REQUIRED IMPORTED_TARGET ipopt)
+
+    add_omplapp_demo(demo_ParkingPureSampling Parking/ParkingPureSampling.cpp)
+
+    add_omplapp_demo(demo_ParkingAC Parking/ParkingAC.cpp)
+    target_link_libraries(demo_ParkingAC adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_ParkingMJ2 Parking/ParkingMJ2.cpp)
+    target_link_libraries(demo_ParkingMJ2 adolc PkgConfig::ipopt)
+    #add_omplapp_demo(demo_ParkingActivePoints Parking/ParkingActivePoints.cpp)
+
+    add_omplapp_demo(demo_ParkingDualDistance Parking/ParkingDualDistance.cpp)
+    target_link_libraries(demo_ParkingDualDistance adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_ParkingDualMJ2 Parking/ParkingDualMJ2.cpp)
+    target_link_libraries(demo_ParkingDualMJ2 adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_ParkingMJ2Initial Parking/ParkingMJ2Initial.cpp)
+    target_link_libraries(demo_ParkingMJ2Initial adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_ParkingMJ2InitialWoDynamics Parking/ParkingMJ2InitialWoDynamics.cpp)
+    target_link_libraries(demo_ParkingMJ2InitialWoDynamics adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_ParkingCompare Parking/ParkingCompare.cpp)
+    target_link_libraries(demo_ParkingCompare adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_DifferentialDriving DifferentialDriving/DifferentialDriving.cpp)
+    target_link_libraries(demo_DifferentialDriving adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_DrivingWoObstacles RandomScenariosDriving/DrivingWoObstacles.cpp)
+    target_link_libraries(demo_DrivingWoObstacles adolc PkgConfig::ipopt)
+    add_omplapp_demo(demo_DrivingBoxAp RandomScenariosDriving/DrivingBoxAp.cpp)
+    target_link_libraries(demo_DrivingBoxAp adolc PkgConfig::ipopt)
+    add_omplapp_demo(demo_DrivingBoxApAABB RandomScenariosDriving/DrivingBoxApAABB.cpp)
+    target_link_libraries(demo_DrivingBoxApAABB adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_DrivingLocalCollision RandomScenariosDriving/DrivingLocalCollision.cpp)
+    target_link_libraries(demo_DrivingLocalCollision adolc PkgConfig::ipopt)
+    add_omplapp_demo(demo_DrivingBox RandomScenariosDriving/DrivingBox.cpp)
+    target_link_libraries(demo_DrivingBox adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_DrivingBoxCompare RandomScenariosDriving/DrivingBoxCompare.cpp)
+    target_link_libraries(demo_DrivingBoxCompare adolc PkgConfig::ipopt)
+    add_omplapp_demo(demo_DrivingBoxCompareAABB RandomScenariosDriving/DrivingBoxCompareAABB.cpp)
+    target_link_libraries(demo_DrivingBoxCompareAABB adolc PkgConfig::ipopt)
+    add_omplapp_demo(demo_DrivingActivePoints RandomScenariosDriving/DrivingActivePoints.cpp)
+    add_omplapp_demo(demo_DrivingPureSampling RandomScenariosDriving/DrivingPureSampling.cpp)
+
+    add_omplapp_demo(demo_OvertakingBox Overtaking/OvertakingBox.cpp)
+    target_link_libraries(demo_OvertakingBox adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_OvertakingBoxAp Overtaking/OvertakingBoxAp.cpp)
+    target_link_libraries(demo_OvertakingBoxAp adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_OvertakingBoxCompare Overtaking/OvertakingBoxCompare.cpp)
+    target_link_libraries(demo_OvertakingBoxCompare adolc PkgConfig::ipopt)
+
+    add_omplapp_demo(demo_OvertakingStageOne Overtaking/OvertakingStageOne.cpp)
+    target_link_libraries(demo_OvertakingStageOne adolc PkgConfig::ipopt)
+
     add_omplapp_demo(demo_create_geometries BulletTest/create_geometries_example.cpp)
     add_omplapp_demo(demo_parse_mesh BulletTest/parse_mesh_example.cpp)
     add_omplapp_demo(demo_box_box BulletTest/box_box.cpp)
     add_omplapp_demo(demo_RandomScenarioCreation RandomPolygonCircles/RandomScenarioCreation.cpp)
-    add_omplapp_demo(demo_RandomScenarioRead RandomPolygonCircles/RandomScenarioRead.cpp)
-    add_omplapp_demo(demo_DistanceCalculation RandomPolygonCircles/DistanceCalculation.cpp)
+    #add_omplapp_demo(demo_RandomScenarioAABB RandomPolygonCircles/RandomScenarioAABB.cpp RandomPolygonCircles/RandomScenarioRead.cpp)
+    add_omplapp_demo(demo_RandomScenarioReal2CSpace RandomPolygonCircles/RandomScenarioReal2CSpace.cpp RandomPolygonCircles/RandomScenarioRead.cpp)
+    add_omplapp_demo(demo_DistanceCalculation Distance/DistanceCalculation.cpp)
 
     add_omplapp_demo(demo_Exam MessTest/Exam.cpp)
     add_omplapp_demo(demo_TestBinaryHeap MessTest/TestBinaryHeap.cpp)
@@ -40,28 +106,28 @@ if (OMPL_BUILD_DEMOS)
     add_omplapp_demo(demo_TestVectorErase MessTest/TestVectorErase.cpp)
     add_omplapp_demo(demo_TestGraphRemoveNodeVSClearAdd MessTest/TestGraphRemoveNodeVSClearAdd.cpp)
 
-    add_omplapp_demo(demo_SimpleConfigurationCertificate
-        SimpleConfigurationCertificate/SimpleConfigurationCertificate.cpp
-        SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.h
-        SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.cpp
-        SimpleConfigurationCertificate/CSCRRT.h
-        SimpleConfigurationCertificate/CSCRRT.h
-        SimpleConfigurationCertificate/CSCRRT.cpp
-        SimpleConfigurationCertificate/CSCRRTstar.h
-        SimpleConfigurationCertificate/CSCRRTstar.cpp
-        SimpleConfigurationCertificate/CSCRRTConnect.h
-        SimpleConfigurationCertificate/CSCRRTConnect.cpp)
+    #add_omplapp_demo(demo_SimpleConfigurationCertificate
+        #SimpleConfigurationCertificate/SimpleConfigurationCertificate.cpp
+        #SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.h
+        #SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.cpp
+        #SimpleConfigurationCertificate/CSCRRT.h
+        #SimpleConfigurationCertificate/CSCRRT.h
+        #SimpleConfigurationCertificate/CSCRRT.cpp
+        #SimpleConfigurationCertificate/CSCRRTstar.h
+        #SimpleConfigurationCertificate/CSCRRTstar.cpp
+        #SimpleConfigurationCertificate/CSCRRTConnect.h
+        #SimpleConfigurationCertificate/CSCRRTConnect.cpp)
 
-    add_omplapp_demo(demo_SimpleConfigurationBenchmark
-        SimpleConfigurationCertificate/SimpleConfigurationBenchmark.cpp
-        SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.h
-        SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.cpp
-        SimpleConfigurationCertificate/CSCRRT.h
-        SimpleConfigurationCertificate/CSCRRT.cpp
-        SimpleConfigurationCertificate/CSCRRTstar.h
-        SimpleConfigurationCertificate/CSCRRTstar.cpp
-        SimpleConfigurationCertificate/CSCRRTConnect.h
-        SimpleConfigurationCertificate/CSCRRTConnect.cpp)
+    #add_omplapp_demo(demo_SimpleConfigurationBenchmark
+        #SimpleConfigurationCertificate/SimpleConfigurationBenchmark.cpp
+        #SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.h
+        #SimpleConfigurationCertificate/SimpleCertificateStateValidityChecker.cpp
+        #SimpleConfigurationCertificate/CSCRRT.h
+        #SimpleConfigurationCertificate/CSCRRT.cpp
+        #SimpleConfigurationCertificate/CSCRRTstar.h
+        #SimpleConfigurationCertificate/CSCRRTstar.cpp
+        #SimpleConfigurationCertificate/CSCRRTConnect.h
+        #SimpleConfigurationCertificate/CSCRRTConnect.cpp)
 
     add_omplapp_demo(demo_RandomPolygonCircles RandomPolygonCircles/RandomPolygonCirclesPlanning.cpp RandomPolygonCircles/NaiveConnect.h RandomPolygonCircles/NaiveConnect.cpp)
     add_omplapp_demo(demo_RandomPolygonCirclesBenchmark RandomPolygonCircles/RandomPolygonCirclesBenchmark.cpp)

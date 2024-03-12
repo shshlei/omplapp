@@ -36,8 +36,8 @@
 
 # Author: Shi Shenglei
 
-import argparse
 import os
+import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -106,16 +106,16 @@ if __name__ == "__main__":
     #colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
     #['#26b9ce', '#7f3b71', '#2a3377', '#9fa0a0', '#85878b', '#73cdc9', '#afceff', '#ffafaf']
 
-    tx = [0.0086579571682871, -0.02506512753291945, 0.012808997914287135, 0.0086579571682871];
-    ty = [0.028723505664735693, 0.01648451945791818, -0.027128021904145316, 0.028723505664735693];
-
     tx = [0.00232897858414355, -0.006532563766459726, 0.003404498957143567];
     ty = [0.007361752832367847, 0.00424225972895909, -0.007564010952072658];
 
     tx = [0.00432897858414355, -0.012532563766459726, 0.006404498957143567];
     ty = [0.014361752832367847, 0.00824225972895909, -0.013564010952072658];
 
-    fig, ax = plt.subplots(figsize=(1.8, 1.8))
+    tx = [0.0086579571682871, -0.02506512753291945, 0.012808997914287135, 0.0086579571682871];
+    ty = [0.028723505664735693, 0.01648451945791818, -0.027128021904145316, 0.028723505664735693];
+
+    fig, ax = plt.subplots(figsize=(2.5, 2.5))
     if args.collision_status:
         z = []
         for line in open(args.collision_status, 'r').readlines():
@@ -126,7 +126,8 @@ if __name__ == "__main__":
         x = np.linspace(0.0, 1.0, len(z[0]))
         y = np.linspace(0.0, 1.0, len(z[0]))
         x, y = np.meshgrid(x, y)
-        ax.contourf(x, y, z, levels=1, colors=['#FFFFFF', '#d62728', '#2ca02c'])
+        # ax.contourf(x, y, z, levels=1, colors=['#FFFFFF', '#d62728', '#2ca02c']) # collision
+        ax.contourf(x, y, z, levels=1, colors=['#2ca02c', '#FFFFFF', '#d62728']) # safe
     if args.scenario:
         nobstacle = 0
         patches_circle = []
@@ -210,11 +211,11 @@ if __name__ == "__main__":
             pce.set_color('#85878b')
             pccap.set_color('#85878b')
             pcrect.set_color('#85878b')
-            pcc.set_alpha(0.3)
-            pcp.set_alpha(0.3)
-            pce.set_alpha(0.3)
-            pccap.set_alpha(0.3)
-            pcrect.set_alpha(0.3)
+            pcc.set_alpha(0.2)
+            pcp.set_alpha(0.2)
+            pce.set_alpha(0.2)
+            pccap.set_alpha(0.2)
+            pcrect.set_alpha(0.2)
             pcc.set_linestyle('dashed')
             pcp.set_linestyle('dashed')
             pce.set_linestyle('dashed')
@@ -406,7 +407,7 @@ if __name__ == "__main__":
             circle = Circle((xc, yc), r, facecolor = color2, alpha=0.7, linestyle='--', linewidth=0.5, edgecolor='blue')
             ax.add_patch(circle)
             ax.scatter(xc, yc, s=0.5, c=color1)
-    if True:
+    if False:
         xc = 0.10
         yc = 0.10
         ttx = [x + xc for x in tx]
@@ -423,5 +424,6 @@ if __name__ == "__main__":
     setup(ax)
     plt.tight_layout()
     #plt.savefig('random_scenarios.eps')
+    plt.savefig('random_scenarios.svg')
     plt.savefig('random_scenarios.pdf')
     plt.show()

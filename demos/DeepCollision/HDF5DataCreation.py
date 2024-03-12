@@ -34,14 +34,6 @@ def read(hdf5):
     # Save and exit the file
     f.close()
 
-def modify(hdf5):
-    f = h5py.File(hdf5, "a")
-    f.attrs['problem_name'] = 'hybrid_ellipse_ellipse'
-    # f.attrs['points'] = f.attrs['Points']
-    # del f.attrs['Points']
-    # Save and exit the file
-    f.close()
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='HDF5 Data Creation.')
     parser.add_argument('--data', default=None,
@@ -53,9 +45,8 @@ if __name__ == "__main__":
     parser.add_argument('--points', type=int, default=1000, metavar='N',
                         help='Points number (default: 1000)')
     parser.add_argument('--length', type=int, default=6, metavar='N',
-                        help='length of the each data (default: 6)')
+                        help='length of each data (default: 6)')
     args = parser.parse_args()
 
-    #create(args.data, args.hdf5, args.objects, args.points, args.length)
+    create(args.data, args.hdf5, args.objects, args.points, args.length)
     #read(args.hdf5)
-    modify(args.hdf5)

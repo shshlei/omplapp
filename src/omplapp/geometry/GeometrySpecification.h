@@ -32,6 +32,11 @@ namespace ompl
 
         using GeometricStateExtractor = std::function<const base::State *(const base::State *, unsigned int)>;
 
+        inline const base::State* defaultGeometricStateExtractor(const base::State* state, unsigned int /*index*/)
+        {
+            return state;
+        }
+
         class GeometrySpecification
         {
         public:
@@ -44,7 +49,6 @@ namespace ompl
             std::vector<const aiScene *> obstacles;
             std::vector<aiVector3D>      obstaclesShift;
         };
-
     }
 }
 #endif

@@ -1,0 +1,31 @@
+# 0
+Box
+mean time 0 0.4305410144
+mean time 1 8.661555
+mean cost 26.291245
+Box-Ap
+mean time 0 0.4305410144
+mean time 1 4.9528225599999995
+mean cost 25.447058
+
+
+# 1
+Box
+mean time 0 0.6683508580000002
+mean time 1 6.970728
+mean cost 58.193665
+Box-Ap
+mean time 0 0.6683508580000002
+mean time 1 2.8182267199999997
+mean cost 52.152951
+
+
+# 2
+Box
+mean time 0 3.5507747399999996
+mean time 1 4.403386199999999
+mean cost 50.42319799999999
+Box-Ap
+mean time 0 3.5507747399999996
+mean time 1 2.0013050000000003
+mean cost 45.858777
