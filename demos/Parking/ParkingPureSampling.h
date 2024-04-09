@@ -464,11 +464,11 @@ bool argParse(int argc, char** argv, std::string &spaceType, double &checkResolu
     bpo::options_description desc("Allowed options");
     desc.add_options()
         ("help,h", "produce help message")
-        ("spacetype,s", bpo::value<std::string>()->default_value("SE2"), "(Optional) Specify the planning space type, default to RealVector2 if not given. Valid options are RealVector2, SE2, Dubins, ReedsShepp.")
+        ("spacetype,s", bpo::value<std::string>()->default_value("SE2"), "(Optional) Specify the planning space type, default to SE2 if not given. Valid options are RealVector2, SE2, Dubins, ReedsShepp.")
         ("checkResolution", bpo::value<double>()->default_value(0.01), "(Optional) Specify the collision checking resolution. Defaults to 0.01 and must be greater than 0.")
         ("runtime,t", bpo::value<double>()->default_value(1.0), "(Optional) Specify the runtime in seconds. Defaults to 1 and must be greater than 0.")
         ("planner,p", bpo::value<std::string>()->default_value("RRT"), "(Optional) Specify the planner to use, defaults to RRT if not given. Valid options are RRT, RRTConnect, BiASE, RRTstar, InformedRRTstar, BITstar, BiASEstar.")
-        ("parking_forward", bpo::value<bool>()->default_value(false), "(Optional) Specify if forward parking, default to true if not given")
+        ("parking_forward", bpo::value<bool>()->default_value(false), "(Optional) Specify if forward parking, default to false if not given")
         ("parking_scenario", bpo::value<int>()->default_value(0), "(Optional) Specify the parking scenario, default to 0 if not given. Valid options are 0, 1, 2, 3")
         ("parking_case", bpo::value<int>()->default_value(0), "(Optional) Specify the parking case, default to 0 if not given. Valid options are 0, 1, 2")
         ("expected_nnodes", bpo::value<std::size_t>()->default_value(0), "(Optional) Specify the discrete nnodes");
@@ -631,11 +631,9 @@ bool solve(int argc, char* argv[], std::shared_ptr<app::Box2dStateValidityChecke
         path.interpolate();
         if (path.getStateCount() < expected_nnodes) path.interpolate(expected_nnodes);
 
-        /*
         std::ofstream ofs("pathsol.txt");
         path.printAsMatrix(ofs);
         ofs.close();
-        */
 
         time::point timeStart = time::now();
         // extract expected_nnodes states 
@@ -658,12 +656,26 @@ bool solve(int argc, char* argv[], std::shared_ptr<app::Box2dStateValidityChecke
         timeUsed += time::seconds(time::now() - timeStart);
     }
 
-    /*
     base::PlannerData pd(si);
     setup.getPlannerData(pd);
-    base::PlannerDataStorage pds;
-    pds.store(pd, "pdsol.txt");
-    */
+    std::ofstream ofs("pdsol.txt");
+    for (unsigned int i = 0; i < pd.numVertices(); i++)
+    {
+        std::vector<unsigned int> edgeList;
+        if (!pd.getEdges(i, edgeList)) continue;
+
+        const ompl::base::State * statei = pd.getVertex(i).getState();
+        const ompl::base::SE2StateSpace::StateType * se2_statei = statei->as<ompl::base::SE2StateSpace::StateType>();
+
+        ofs << se2_statei->getX() << " " << se2_statei->getY() << " "; 
+        for (unsigned int j : edgeList)
+        {
+            const ompl::base::State * statej = pd.getVertex(j).getState();
+            const ompl::base::SE2StateSpace::StateType * se2_statej = statej->as<ompl::base::SE2StateSpace::StateType>();
+            ofs << se2_statej->getX() << " " << se2_statej->getY() << std::endl; 
+        }
+    }
+    ofs.close();
 
     return res;
 }

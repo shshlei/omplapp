@@ -48,11 +48,17 @@ from shapely.geometry import LineString as SLineString
 from descartes import PolygonPatch as SPolygonPatch
 
 from math import cos, sin, sqrt
+import sympy as sp
+
+h_a = 0.025
+h_b = 0.025
+radius =sqrt(h_a * h_a + h_b * h_b)
 
 if __name__ == "__main__":
     # Create an argument parser
     parser = argparse.ArgumentParser(description='Draw planned path.')
     parser.add_argument('-s', '--scenario', default=None, help='Filename of random scenario')
+    parser.add_argument('-path', '--plannerpath', default=None, help='(Optional) Filename of the planner path.')
     args = parser.parse_args()
 
     plt.style.use(['seaborn-v0_8-deep', 'seaborn-v0_8-paper'])
@@ -61,6 +67,81 @@ if __name__ == "__main__":
     colors = prop_cycle.by_key()['color']
 
     fig, ax = plt.subplots(figsize=(2.5, 2.5))
+    circles = []
+    if args.scenario:
+        nobstacle = 0
+        patches_circle = []
+        for line in open(args.scenario, 'r').readlines():
+            l = line.strip()
+            if not l:
+                continue
+            if l[0] == '#':
+                continue
+            if l == 'shapes':
+                continue
+            if nobstacle == 0:
+                temp = l.split(' ')
+                if temp[0] == 'numbers':
+                    nobstacle = int(temp[1])
+                    continue
+            params = [float(x) for x in l.split(' ')]
+            params[0] = int(params[0])
+            if params[0] == 0: # circle
+                x = params[1]
+                y = params[2]
+                r = params[3]
+                circle = Circle((x, y), r, color = 'gray')
+                patches_circle.append(circle)
+                circles.append([0, x, y, r])
+            elif params[0] == 1: # polygon
+                params[1] = int(params[1])
+                count = params[1]
+                vecs = params[2:]
+                x = vecs[::2]
+                y = np.array(vecs[1::2])
+                cx = np.mean(x)
+                cy = np.mean(y)
+                center = (cx, cy)
+                r = sqrt((cx - x[0]) * (cx - x[0]) + (cy - y[0]) * (cy - y[0]))
+                #r, center = circumcircle_radius_and_center(x[0], y[0], x[1], y[1], x[2], y[2])
+                circle = Circle(center, r, color = 'gray')
+                patches_circle.append(circle)
+                circles.append([0, cx, cy, r])
+            elif params[0] == 2: # ellipse
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                a = params[4]
+                b = params[5]
+                circle = Circle((x, y), max(a, b), color = 'gray')
+                patches_circle.append(circle)
+                circles.append([0, x, y, max(a, b)])
+            elif params[0] == 3: # capsule
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                r = params[4]
+                h = params[5]
+                circle = Circle((x, y), r + h, color = 'gray')
+                patches_circle.append(circle)
+                circles.append([0, x, y, r + h])
+            elif params[0] == 4: # rectangle
+                x = params[1]
+                y = params[2]
+                yaw = params[3]
+                a = params[4]
+                b = params[5]
+                circle = Circle((x, y), sqrt(a * a + b * b), color = 'gray')
+                patches_circle.append(circle)
+                circles.append([0, x, y, sqrt(a * a + b * b)])
+        #np.savetxt('circles.txt', circles, delimiter=' ')
+        pcc = PatchCollection(patches_circle, match_original=False)
+        pcc.set_facecolor('white')
+        pcc.set_edgecolor('red')
+        pcc.set_linestyle('-')
+        pcc.set_linewidth(0.75)
+        ax.add_collection(pcc)
+
     if args.scenario:
         nobstacle = 0
         patches_circle = []
@@ -91,7 +172,6 @@ if __name__ == "__main__":
                 patches_circle.append(circle)
             elif params[0] == 1: # polygon
                 params[1] = int(params[1])
-                count = params[1]
                 vecs = params[2:]
                 x = vecs[::2]
                 y = np.array(vecs[1::2])
@@ -143,58 +223,52 @@ if __name__ == "__main__":
         pce.set_color('gray')
         pccap.set_color('gray')
         pcrect.set_color('gray')
+
+        pcc.set_alpha(0.75)
+        pcp.set_alpha(0.75)
+        pce.set_alpha(0.75)
+        pccap.set_alpha(0.75)
+        pcrect.set_alpha(0.75)
+
         ax.add_collection(pcc)
         ax.add_collection(pcp)
         ax.add_collection(pce)
         ax.add_collection(pccap)
         ax.add_collection(pcrect)
 
-        rect = Rectangle((0.025, 0.025), 0.05, 0.05, color='green')
+    if args.plannerpath:
+        xy = []
+        for line in open(args.plannerpath, 'r').readlines():
+            l = line.strip()
+            if not l:
+                continue
+            xy.append([float(x) for x in l.split(' ')])
+        dxy = np.array(xy).transpose()
+        x = dxy[0]
+        y = dxy[1]
+        ax.plot(x, y, color='#B30059', linewidth=0.7)
+
+        if True:
+            patches_circle = []
+            for xc, yc in zip(x, y):
+                circle = Circle((xc, yc), radius, facecolor='w', edgecolor='g', lw=0.5, zorder=10, fill=False)
+                patches_circle.append(circle)
+            pccircle = PatchCollection(patches_circle, match_original=True)
+            ax.add_collection(pccircle)
+
+    if True:
+        """start and goal polygon"""
+        rect = Rectangle((0.05 - h_a, 0.05 - h_b), 2 * h_a, 2 * h_b, color='green')
+        circle = Circle((0.05, 0.05), radius, facecolor='w', edgecolor='green', lw=1.0, fill='False')
+        ax.add_patch(circle)
         ax.add_patch(rect)
         ax.scatter(0.05, 0.05, color='#B30059', s=10)
 
-        rect = Rectangle((0.925, 0.925), 0.05, 0.05, color='green')
+        rect = Rectangle((0.95 - h_a, 0.95 - h_b), 2 * h_a, 2 * h_b, color='red')
+        circle = Circle((0.95, 0.95), radius, facecolor='w', edgecolor='red', lw=1.0, fill='False')
+        ax.add_patch(circle)
         ax.add_patch(rect)
         ax.scatter(0.95, 0.95, color='#B30059', s=10)
-
-    if False:
-        """start and goal polygon"""
-        xc = 0.05
-        yc = 0.05
-        ttx = [x + xc for x in tx]
-        tty = [y + yc for y in ty]
-        ax.fill(ttx, tty, 'green', zorder=20)
-        ax.scatter(xc, yc, color='#B30059', s = 0.2)
-
-        ax.annotate("",
-                    xy=(0.05, 0.05), xycoords='data',
-                    xytext=(0.15, 0.15), textcoords='data',
-                    size=5, va="center", ha="center",
-                    arrowprops=dict(arrowstyle="simple",
-                                    connectionstyle="arc3,rad=0.0",
-                                    ls = "dashed",
-                                    lw = 0.1,
-                                    color='blue')
-                    )
-        ax.text(.15, .15, r'$\mathrm{start}$', color='blue', transform=ax.transAxes, ha="left", va="top", fontsize=5)
-
-        xc = 0.95
-        yc = 0.95
-        ttx = [x + xc for x in tx]
-        tty = [y + yc for y in ty]
-        ax.fill(ttx, tty, 'red', zorder=20)
-        ax.scatter(xc, yc, color='#B30059', s = 0.2)
-        ax.annotate("",
-                    xy=(0.95, 0.95), xycoords='data',
-                    xytext=(0.85, 0.85), textcoords='data',
-                    size=5, va="center", ha="center",
-                    arrowprops=dict(arrowstyle="simple",
-                                    connectionstyle="arc3,rad=0.0",
-                                    ls = "dashed",
-                                    lw = 0.1,
-                                    color='blue')
-                    )
-        ax.text(.85, .85, r'$\mathrm{goal}$', color='blue', transform=ax.transAxes, ha="left", va="top", fontsize=5)
 
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(0.0, 1.0)
@@ -203,8 +277,6 @@ if __name__ == "__main__":
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_aspect('equal')
-    #setup(ax)
     plt.tight_layout()
-    plt.savefig('random_scenarios.svg')
-    # plt.savefig('random_scenarios.eps')
+    #plt.savefig('random_scenarios.svg')
     plt.show()
