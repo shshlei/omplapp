@@ -39,7 +39,7 @@
 #include <box2d_collision/b2_bvh_manager.h>
 #include <box2d_collision/b2_distance.h>
 
-#include <psopt/solver.hpp>
+#include <psopt/optimal_control_solver.hpp>
 
 #include <ompl/util/Console.h>
 
@@ -137,7 +137,7 @@ int main()
 
   std::shared_ptr<b2BVHManager> svc_;
 
-  psopt::ProblemInfo<double>* info_{nullptr};
+  psopt::OptimalControlProblemInfo<double>* info_{nullptr};
 
   DifferentialDriving<double>* problem_{nullptr};
 
@@ -163,7 +163,7 @@ int main()
   msdata.parameters_along_trajectory = false;
   msdata.treat_dynamics_as_cost = false;
   msdata.nnodes.push_back(20);
-  info_ = new psopt::ProblemInfo<double>(msdata);
+  info_ = new psopt::OptimalControlProblemInfo<double>(msdata);
   info_->setLinearSolver("ma57");
   info_->setTolerance(1.e-8);
 
@@ -256,7 +256,7 @@ int main()
   const std::size_t ncontrols = info_->getPhaseNumberControls();
 
   // initial guess states
-  psopt::Solver<double> solver;
+  psopt::OptimalControlSolver<double> solver;
   solver.setPhaseNumbers(nphases);
   std::size_t start = 0;
   for (std::size_t k = 0; k < nphases; k++)

@@ -120,13 +120,13 @@ class DrivingProblemJ2 : public DrivingProblemBase<Scalar, Scalar2>
 {
 public:
 
-    DrivingProblemJ2(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : DrivingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
+    DrivingProblemJ2(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : DrivingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
     {
     }
 
     virtual ~DrivingProblemJ2() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         DrivingProblemJ2<adouble, Scalar2>* prob = new DrivingProblemJ2<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_);
         prob->setLocalCollisioniElements(this->localCollisionElements_);
@@ -208,7 +208,7 @@ int main(int argc, char* argv[])
     std::vector<std::size_t> nnodes(msdata.nsegments, nmod);
     nnodes.back() = expected_nnodes - (msdata.nsegments - 1) * (nmod - 1);
     msdata.nnodes.swap(nnodes);
-    psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+    psopt::OptimalControlProblemInfo<double>* info = new psopt::OptimalControlProblemInfo<double>(msdata);
     info->setLinearSolver("ma57");
     info->setTolerance(1.e-8);
 
@@ -245,7 +245,7 @@ int main(int argc, char* argv[])
     driving_guess(info, x0, y0, theta0);
 
     // initial guess states
-    psopt::Solver<double> solver;
+    psopt::OptimalControlSolver<double> solver;
     solver.setPhaseNumbers(msdata.nsegments);
     std::size_t start = 0;
     for (std::size_t k = 0; k < msdata.nsegments; k++)

@@ -41,6 +41,7 @@
 #include <box2d_collision/b2_collision.h>
 
 #include <psopt/interpolation.hpp>
+#include <bomp/collision_constraints/active_collision_constraints.h>
 
 // two-circle approximation of the vehicle
 template <typename Scalar = double>
@@ -176,14 +177,14 @@ class DrivingProblemBox : public DrivingProblemBase<Scalar, Scalar2>
 {
 public:
 
-    DrivingProblemBox(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, const VehicleCircleParam<Scalar2>* vehicleCircleParam) : DrivingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
+    DrivingProblemBox(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, const VehicleCircleParam<Scalar2>* vehicleCircleParam) : DrivingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
     {
         vehicleCircleParam_ = vehicleCircleParam;
     }
 
     virtual ~DrivingProblemBox() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         DrivingProblemBox<adouble, Scalar2>* prob = new DrivingProblemBox<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_, this->vehicleCircleParam_);
         prob->setLinearizedParameters(this);
@@ -295,13 +296,13 @@ class DrivingProblemBoxAp : public DrivingProblemBase<Scalar, Scalar2>
 {
 public:
 
-    DrivingProblemBoxAp(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : DrivingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
+    DrivingProblemBoxAp(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : DrivingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
     {
     }
 
     virtual ~DrivingProblemBoxAp() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         DrivingProblemBoxAp<adouble, Scalar2>* prob = new DrivingProblemBoxAp<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_);
         prob->setActivePoints(activePoints_);
@@ -342,7 +343,7 @@ public:
             const Scalar theta = cstates[2];
             Eigen::Matrix<Scalar, 2, 3> invtransform = invtransform_2D(x, y, theta);
             invtransform(0, 2) -= this->vehicleParam_->delta;
-            MJ_2_Active_Constraints_2D(paths + offset, invtransform, apoints.activePoints);
+            active_Constraints_2D(paths + offset, invtransform, apoints.activePoints);
             offset += apoints.activePoints.size();
         }
     }
@@ -393,7 +394,7 @@ int main(int argc, char* argv[])
             std::vector<std::size_t> nnodes(msdata.nsegments, nmod);
             nnodes.back() = expected_nnodes - (msdata.nsegments - 1) * (nmod - 1);
             msdata.nnodes.swap(nnodes);
-            psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+            psopt::OptimalControlProblemInfo<double>* info = new psopt::OptimalControlProblemInfo<double>(msdata);
             info->setLinearSolver("ma57");
             info->setTolerance(1.e-8);
 
@@ -437,7 +438,7 @@ int main(int argc, char* argv[])
             driving_guess(info, x0, y0, theta0);
 
             // initial guess states
-            psopt::Solver<double> solver;
+            psopt::OptimalControlSolver<double> solver;
             solver.setPhaseNumbers(msdata.nsegments);
             std::size_t start = 0;
             for (std::size_t k = 0; k < msdata.nsegments; k++)
@@ -617,7 +618,7 @@ int main(int argc, char* argv[])
             std::vector<std::size_t> nnodes(msdata.nsegments, nmod);
             nnodes.back() = expected_nnodes - (msdata.nsegments - 1) * (nmod - 1);
             msdata.nnodes.swap(nnodes);
-            psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+            psopt::OptimalControlProblemInfo<double>* info = new psopt::OptimalControlProblemInfo<double>(msdata);
             info->setLinearSolver("ma57");
             info->setTolerance(1.e-8);
 
@@ -660,7 +661,7 @@ int main(int argc, char* argv[])
             driving_guess(info, x0, y0, theta0);
 
             // initial guess states
-            psopt::Solver<double> solver;
+            psopt::OptimalControlSolver<double> solver;
             solver.setPhaseNumbers(msdata.nsegments);
             std::size_t start = 0;
             for (std::size_t k = 0; k < msdata.nsegments; k++)

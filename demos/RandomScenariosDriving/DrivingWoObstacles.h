@@ -34,28 +34,27 @@
 
 /* Author: Shi Shenglei */
 
-#include <psopt/problem.hpp>
-#include <psopt/solver.hpp>
+#include <psopt/optimal_control_problem.hpp>
+#include <psopt/optimal_control_solver.hpp>
 #include <bomp/utils.hpp>
 #include <bomp/collision_constraints/J_function_collision_constraints.h>
-#include <bomp/collision_constraints/active_points_collision_constraints.h>
 
 #include <boost/program_options.hpp>
 
 bool argParse(int argc, char** argv, std::size_t & expected_nnodes);
 
 template <typename Scalar = double, typename Scalar2 = Scalar>
-class DrivingProblemBase : public psopt::Problem<Scalar, Scalar2>
+class DrivingProblemBase : public psopt::OptimalControlProblem<Scalar, Scalar2>
 {
 public:
 
-    DrivingProblemBase(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : psopt::Problem<Scalar, Scalar2>(prob), vehicleParam_(vehicleParam)
+    DrivingProblemBase(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : psopt::OptimalControlProblem<Scalar, Scalar2>(prob), vehicleParam_(vehicleParam)
     {
     }
 
     virtual ~DrivingProblemBase() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         DrivingProblemBase<adouble, Scalar2>* prob = new DrivingProblemBase<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_);
         prob->setLinearizedParameters(this);
@@ -296,7 +295,7 @@ void setStartAndGoal(double & x0, double & y0, double & theta0, double & xf, dou
 }
 
 template <typename Scalar = double>
-void driving_bounds(psopt::ProblemInfo<Scalar>* info, Scalar x0, Scalar y0, Scalar theta0, Scalar xf, Scalar yf, Scalar thetaf)
+void driving_bounds(psopt::OptimalControlProblemInfo<Scalar>* info, Scalar x0, Scalar y0, Scalar theta0, Scalar xf, Scalar yf, Scalar thetaf)
 {
     Scalar xL = 0.0;
     Scalar xU = 1.0;
@@ -346,7 +345,7 @@ void driving_bounds(psopt::ProblemInfo<Scalar>* info, Scalar x0, Scalar y0, Scal
 
 // states, controls, time guess
 template <typename Scalar = double>
-void driving_guess(psopt::ProblemInfo<Scalar>* info, Scalar x0, Scalar y0, Scalar theta0)
+void driving_guess(psopt::OptimalControlProblemInfo<Scalar>* info, Scalar x0, Scalar y0, Scalar theta0)
 {
     Scalar stime = 0.0;
     Scalar dtime = 10.0 / info->getPhaseNumbers();

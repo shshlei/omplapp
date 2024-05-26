@@ -177,14 +177,14 @@ class DrivingProblemBox : public DrivingProblemBase<Scalar, Scalar2>
 {
 public:
 
-    DrivingProblemBox(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, const VehicleCircleParam<Scalar2>* vehicleCircleParam) : DrivingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
+    DrivingProblemBox(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, const VehicleCircleParam<Scalar2>* vehicleCircleParam) : DrivingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
     {
         vehicleCircleParam_ = vehicleCircleParam;
     }
 
     virtual ~DrivingProblemBox() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         DrivingProblemBox<adouble, Scalar2>* prob = new DrivingProblemBox<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_, this->vehicleCircleParam_);
         prob->setLinearizedParameters(this);
@@ -253,7 +253,7 @@ int main(int argc, char* argv[])
     std::vector<std::size_t> nnodes(msdata.nsegments, nmod);
     nnodes.back() = expected_nnodes - (msdata.nsegments - 1) * (nmod - 1);
     msdata.nnodes.swap(nnodes);
-    psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+    psopt::OptimalControlProblemInfo<double>* info = new psopt::OptimalControlProblemInfo<double>(msdata);
     info->setLinearSolver("ma57");
     info->setTolerance(1.e-8);
 
@@ -310,7 +310,7 @@ int main(int argc, char* argv[])
     driving_guess(info, x0, y0, theta0);
 
     // initial guess states
-    psopt::Solver<double> solver;
+    psopt::OptimalControlSolver<double> solver;
     solver.setPhaseNumbers(msdata.nsegments);
     std::size_t start = 0;
     for (std::size_t k = 0; k < msdata.nsegments; k++)

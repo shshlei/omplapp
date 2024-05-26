@@ -51,39 +51,6 @@ from descartes import PolygonPatch as SPolygonPatch
 
 from math import cos, sin, sqrt
 
-def setup(axs):
-    xlim = axs.get_xlim()
-    ylim = axs.get_ylim()
-
-    #axs.spines["top"].set_visible(False)
-    #axs.spines["right"].set_visible(False)
-
-    lw = 0.5
-    axs.spines.left.set_linewidth(lw)
-    axs.spines.right.set_linewidth(lw)
-    axs.spines.top.set_linewidth(lw)
-    axs.spines.bottom.set_linewidth(lw)
-
-    axs.spines["left"].set_position(("data", xlim[0]))
-    axs.spines['left'].set_bounds(ylim[0], ylim[1])
-    axs.spines['right'].set_bounds(ylim[0], ylim[1])
-
-    axs.spines["bottom"].set_position(("data", ylim[0]))
-    axs.spines['bottom'].set_bounds(xlim[0], xlim[1])
-    axs.spines['top'].set_bounds(xlim[0], xlim[1])
-
-    axs.xaxis.set_ticks_position('bottom')
-    axs.xaxis.set_tick_params(which='major', direction = 'in', width=1.00, length=3)
-    #axs.xaxis.set_major_formatter(ticker.StrMethodFormatter("{x} s"))
-
-    axs.yaxis.set_ticks_position('left')
-    axs.yaxis.set_tick_params(which='major', direction = 'in', width=1.00, length=3)
-
-    axs.yaxis.grid(True, linestyle=(0, (5, 5)), lw = 1, which='major', color='darkgrey', alpha=1.0)
-
-    axs.set_xlim(xlim)
-    axs.set_ylim(ylim)
-
 if __name__ == "__main__":
     # Create an argument parser
     parser = argparse.ArgumentParser(description='Show random scenario motion planning result.')
@@ -91,15 +58,6 @@ if __name__ == "__main__":
         help='Filename of random scenario')
     parser.add_argument('-collision', '--collision_status', default=None, \
         help='(Optional) Filename of the collision.')
-    parser.add_argument('-sc_pure_sampling', '--sc_pure_sampling', default=None, \
-        help='(optional) filename of the sc pure sampling.')
-    parser.add_argument('-sc_time', '--sc_time', default=None, \
-        help='(optional) filename of the sc time.')
-    parser.add_argument('-sc_count', '--sc_count', default=None, \
-        help='(optional) filename of the planner path.')
-    parser.add_argument('-sc_counts', nargs='*')
-    parser.add_argument('-sc_counts1', nargs='*')
-    parser.add_argument('-sc_counts2', nargs='*')
     parser.add_argument('-sc', '--safety_certificate', default=None, \
         help='(Optional) Filename of the safety certificate spheres.')
     parser.add_argument('-cc', '--collision_certificate', default=None, \
@@ -113,10 +71,7 @@ if __name__ == "__main__":
     #colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
     #['#26b9ce', '#7f3b71', '#2a3377', '#9fa0a0', '#85878b', '#73cdc9', '#afceff', '#ffafaf']
 
-    tx = [0.0086579571682871, -0.02506512753291945, 0.012808997914287135, 0.0086579571682871];
-    ty = [0.028723505664735693, 0.01648451945791818, -0.027128021904145316, 0.028723505664735693];
-
-    fig, ax = plt.subplots(figsize=(1.8, 1.8))
+    fig, ax = plt.subplots(figsize=(2.5, 2.5))
     if args.collision_status:
         z = []
         for line in open(args.collision_status, 'r').readlines():
@@ -129,6 +84,31 @@ if __name__ == "__main__":
         x, y = np.meshgrid(x, y)
         #ax.contourf(x, y, z, levels=1, colors=['#2ca02c', '#FFFFFF', '#d62728'])
         ax.contourf(x, y, z, levels=1, colors=['#FFFFFF', '#d62728'])
+    if args.safety_certificate:
+        xyrs = []
+        for line in open(args.safety_certificate, 'r').readlines():
+            l = line.strip()
+            if not l:
+                continue
+            xyrs.append([float(x) for x in l.split(' ')])
+        xyrs = np.array(xyrs)
+        xys = xyrs
+        #xys = xyrs[:, :2]
+        xys, ind = np.unique(xys, axis=0, return_index=True)
+        xyrs = xyrs[ind]
+
+        color1 = '#B30059'#'#DD5D5F'
+        color2 = '#2ca02c'#'#1f9c3a'
+        patches_circle = []
+        for xyr in xyrs:
+            xc = xyr[0]
+            yc = xyr[1]
+            r  = xyr[2]
+            circle = Circle((xc, yc), r, facecolor=color2, alpha=0.7, linestyle='--', linewidth=0.5, edgecolor='blue')
+            patches_circle.append(circle)
+            ax.scatter(xc, yc, s=2.0, color=color1, zorder=10)
+        pcc = PatchCollection(patches_circle, match_original=True)
+        ax.add_collection(pcc)
     if args.collision_certificate:
         data = []
         for line in open(args.collision_certificate, 'r').readlines():
@@ -297,202 +277,14 @@ if __name__ == "__main__":
         ax.add_collection(pce)
         ax.add_collection(pccap)
         ax.add_collection(pcrect)
-    if args.safety_certificate:
-        xyrs = []
-        for line in open(args.safety_certificate, 'r').readlines():
-            l = line.strip()
-            if not l:
-                continue
-            xyrs.append([float(x) for x in l.split(' ')])
-        xyrs = np.array(xyrs)
-        xys = xyrs[:, :2]
-        xys, ind = np.unique(xys, axis=0, return_index=True)
-        xyrs = xyrs[ind]
 
-        color1 = '#B30059'#'#DD5D5F'
-        color2 = '#2ca02c'#'#1f9c3a'
-        patches_circle = []
-        for xyr in xyrs:
-            xc = xyr[0]
-            yc = xyr[1]
-            r  = xyr[2]
-            circle = Circle((xc, yc), r, facecolor = color2, alpha=0.7, linestyle='--', linewidth=0.1, edgecolor='blue')
-            patches_circle.append(circle)
-            ax.scatter(xc, yc, s=0.2, color=color1)
-        pcc = PatchCollection(patches_circle, match_original=True)
-        ax.add_collection(pcc)
-    if args.sc_count:
-        xy = []
-        for line in open(args.sc_count, 'r').readlines():
-            l = line.strip()
-            if not l:
-                continue
-            xy.append([float(x) for x in l.split(' ')])
-        dxy = np.array(xy).transpose()
-        x = dxy[0] # total
-        y = dxy[1] # sc
-        ax.plot(y, color='green', linewidth=2.5)
-    if args.sc_counts:
-        xys = np.array([])
-        for sc_count in args.sc_counts:
-            xy = []
-            for line in open(sc_count, 'r').readlines():
-                l = line.strip()
-                if not l:
-                    continue
-                xy.append([float(x) for x in l.split(' ')])
-            if (len(xys) == 0):
-                xys = np.array(xy)
-            else:
-                l = min(len(xys), len(xy))
-                xys = xys[:l] + np.array(xy)[:l]
-        xys = xys / len(args.sc_counts)
-        dxy = np.array(xys).transpose()
-        x = dxy[0] # total
-        y = dxy[1] # sc
-        ax.plot(y, linewidth=2.5)
-    if args.sc_counts1:
-        xys = np.array([])
-        for sc_count in args.sc_counts1:
-            xy = []
-            for line in open(sc_count, 'r').readlines():
-                l = line.strip()
-                if not l:
-                    continue
-                xy.append([float(x) for x in l.split(' ')])
-            if (len(xys) == 0):
-                xys = np.array(xy)
-            else:
-                l = min(len(xys), len(xy))
-                xys = xys[:l] + np.array(xy)[:l]
-        xys = xys / len(args.sc_counts1)
-        xys = xys[0:50]
-        dxy = np.array(xys).transpose()
-        x = dxy[0] # total
-        y = dxy[1] # sc
-        ax.plot(y, linewidth=2.5, label='Real2')
-    if args.sc_counts2:
-        xys = np.array([])
-        for sc_count in args.sc_counts2:
-            xy = []
-            for line in open(sc_count, 'r').readlines():
-                l = line.strip()
-                if not l:
-                    continue
-                xy.append([float(x) for x in l.split(' ')])
-            if (len(xys) == 0):
-                xys = np.array(xy)
-            else:
-                l = min(len(xys), len(xy))
-                xys = xys[:l] + np.array(xy)[:l]
-        xys = xys / len(args.sc_counts2)
-        xys = xys[0:50]
-        dxy = np.array(xys).transpose()
-        x = dxy[0] # total
-        y = dxy[1] # sc
-        ax.plot(y, linewidth=2.5, label='SE2')
-    if args.sc_pure_sampling:
-        xy = []
-        for line in open(args.sc_pure_sampling, 'r').readlines():
-            l = line.strip()
-            if not l:
-                continue
-            xy.append([float(x) for x in l.split(' ')])
-        dxy = np.array(xy).transpose()
-        x = dxy[0] # total
-        y = dxy[1] # sc
-        ax.plot(x, x, linewidth=2.5)
-        ax.plot(x, y, linewidth=2.5)
-    if args.sc_time:
-        xy = []
-        for line in open(args.sc_time, 'r').readlines():
-            l = line.strip()
-            if not l:
-                continue
-            xy.append([float(x) for x in l.split(' ')])
-        dxy = np.array(xy).transpose()
-        x = dxy[0] # total
-        y = 100000 * dxy[1] # sc
-        z = 100000 * dxy[2] # notoptimal
-        ax.plot(x, y, linewidth=2.5)
-        ax.plot(x, z, linewidth=2.5)
-
-    if False:
-        xc = 0.0235317
-        yc = 0.403731
-        c  = cos(0.435234)
-        s  = sin(0.435234)
-
-        ttx = [c * x - s * y + xc for x, y in zip(tx, ty)]
-        tty = [s * x + c * y + yc for x, y in zip(tx, ty)]
-        ax.fill(ttx, tty, 'green', edgecolor='#084F17', linewidth=0.5, linestyle='--', alpha=1.0)
-        ax.scatter(xc, yc, s=2.5, c='#B30059')
-
-    if False:
-        xyrs = [[0.212781, 0.58101899999999995, 0.025804199999999999]]
-        for xyr in xyrs:
-            xc = xyr[0]
-            yc = xyr[1]
-            r  = xyr[2]
-            circle = Circle((xc, yc), r, color = 'yellow')
-            ax.add_patch(circle)
-
-    if False:
-        xc = 0.884618
-        yc = 0.306059
-        c  = cos(2.84177)
-        s  = sin(2.84177)
-
-        ttx = [c * x - s * y + xc for x, y in zip(tx, ty)]
-        tty = [s * x + c * y + yc for x, y in zip(tx, ty)]
-        ax.fill(ttx, tty, 'green', edgecolor='#084F17', linewidth=0.5, linestyle='--', alpha=1.0)
-        ax.scatter(xc, yc, s=2.5, c='#B30059')
-
-        if True:
-            circle = Circle((0.85954895981995882, 0.36664328348987019), 0.013278317471065105, facecolor = 'blue', alpha=1.0, linestyle='--', linewidth=0.1, edgecolor='blue')
-            ax.add_patch(circle)
-            ax.scatter(0.86523745005231234, 0.37013211734781171, c='red')
-
-            if True:
-                xc = 0.87307867789838545
-                yc = 0.30108526681786907
-                c  = -0.92489950549028999
-                s  = 0.38021165782208349
-
-                ttx = [c * x - s * y + xc for x, y in zip(tx, ty)]
-                tty = [s * x + c * y + yc for x, y in zip(tx, ty)]
-                ax.fill(ttx, tty, 'green', edgecolor='#084F17', linewidth=0.5, linestyle='--', alpha=1.0)
-                ax.scatter(xc, yc, s=2.5, c='#B30059')
-
-                ax.scatter(0.85954895981995882, 0.36664328348987019, s=2.5, c='red')
-                ax.scatter(0.83480500000000002, 0.35830400000000001, s=2.5, c='blue')
-
-    if False:
-        xc = 0.87307867789838545
-        yc = 0.30108526681786907
-        c  = -0.92489950549028999
-        s  = 0.38021165782208349
-
-        ttx = [c * x - s * y + xc for x, y in zip(tx, ty)]
-        tty = [s * x + c * y + yc for x, y in zip(tx, ty)]
-        ax.fill(ttx, tty, 'green', edgecolor='#084F17', linewidth=0.5, linestyle='--', alpha=1.0)
-        ax.scatter(xc, yc, s=2.5, c='#B30059')
-
-        ax.scatter(0.85954895981995882, 0.36664328348987019, s=2.5, c='red')
-        ax.scatter(0.83480500000000002, 0.35830400000000001, s=2.5, c='blue')
-
-    #props = matplotlib.font_manager.FontProperties()
-    #props.set_size('small')
-    #ax.tick_params(labelsize=5)
-    #ax.legend(framealpha = 0, loc = (0.4, 0.65), fontsize=6)
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(0.0, 1.0)
     ax.set_axis_on()
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_aspect('equal')
-    setup(ax)
     plt.tight_layout()
     #plt.savefig('random_scenarios.eps')
-    #plt.savefig('random_scenarios.pdf')
+    #plt.savefig('safety_circles.svg')
     plt.show()

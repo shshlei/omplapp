@@ -34,9 +34,8 @@
 
 /* Author: Shi Shenglei */
 
-#include <psopt/problem.hpp>
-#include <psopt/solver.hpp>
-#include <psopt/interpolation.hpp>
+#include <psopt/optimal_control_problem.hpp>
+#include <psopt/optimal_control_solver.hpp>
 
 #include <bomp/utils.hpp>
 #include <bomp/overtaking/overtaking_basic_setup.h>
@@ -51,13 +50,13 @@ class OvertakingProblemStageOne : public OvertakingProblemBase<Scalar, Scalar2>
 {
 public:
 
-    OvertakingProblemStageOne(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : OvertakingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
+    OvertakingProblemStageOne(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : OvertakingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
     {
     }
 
     virtual ~OvertakingProblemStageOne() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         OvertakingProblemStageOne<adouble, Scalar2>* prob = new OvertakingProblemStageOne<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_);
         prob->setWoObstacles(wo_obstacles_);
@@ -66,7 +65,7 @@ public:
         return prob;
     }
 
-    void setRectangle(const Eigen::Matrix<double, 2, 4> & rect1)
+    void setRectangle(const Eigen::Matrix<Scalar2, 2, 4> & rect1)
     {
         rect1_ = rect1;
     }
@@ -91,8 +90,8 @@ public:
         Eigen::Matrix<Scalar, 3, 4> rect2 = Eigen::Matrix<Scalar, 3, 4>::Ones();
         rect2.topRows(2) = (rect1_.template cast<Scalar>()).eval();
 
-        rect2.topRows(1).array() += (10.0 + this->vehicleParam_->delta); // overtaking_case == 0
-        if (overtaking_case >= 1) rect2.topRows(1).array() += 10.0 * time;
+        rect2.topRows(1).array() += (overtaking_dist1 + this->vehicleParam_->delta); // overtaking_case == 0
+        if (overtaking_case >= 1) rect2.topRows(1).array() += overtaking_speed * time;
         psopt::rectangle_rectangle_MJ_2_KKT_Norm(paths, parameters, (rect1_.template cast<Scalar>()).eval(), (invtransform * rect2).eval());
         if (overtaking_case == 2)
         {
@@ -104,7 +103,7 @@ public:
 protected:
     bool wo_obstacles_{false};
 
-    Eigen::Matrix<double, 2, 4> rect1_;
+    Eigen::Matrix<Scalar2, 2, 4> rect1_;
 };
 
 bool argParse(int argc, char** argv, int & overtaking_case, std::size_t & expected_nnodes)
@@ -132,7 +131,7 @@ bool argParse(int argc, char** argv, int & overtaking_case, std::size_t & expect
     return true;
 }
 
-bool solve(int argc, char* argv[], psopt::MultiSegmentData & msdata, psopt::Solver<double> & solver, double & timeUsed)
+bool solve(int argc, char* argv[], psopt::MultiSegmentData & msdata, psopt::OptimalControlSolver<double> & solver, double & timeUsed)
 {
     std::size_t expected_nnodes = 30;
     if (!argParse(argc, argv, overtaking_case, expected_nnodes)) return false;
@@ -150,7 +149,7 @@ bool solve(int argc, char* argv[], psopt::MultiSegmentData & msdata, psopt::Solv
     msdata.paths_along_trajectory = true;
     msdata.parameters_along_trajectory = true;
     msdata.nnodes.push_back(expected_nnodes);
-    psopt::ProblemInfo<double> * info = new psopt::ProblemInfo<double>(msdata);
+    psopt::OptimalControlProblemInfo<double> * info = new psopt::OptimalControlProblemInfo<double>(msdata);
     info->setLinearSolver("ma57");
     info->setTolerance(1.e-8);
 
@@ -165,8 +164,6 @@ bool solve(int argc, char* argv[], psopt::MultiSegmentData & msdata, psopt::Solv
     OvertakingProblemStageOne<double>* problem = new OvertakingProblemStageOne<double>(info, vehicleParam);
     problem->setWoObstacles(true);
 
-    info->setPhaseLowerBoundEndTime(6.0, msdata.nsegments - 1);
-    info->setPhaseUpperBoundEndTime(6.0, msdata.nsegments - 1);
     if (!solver.solve(problem)) // initialization without obstacles
     {
         delete info;
@@ -176,21 +173,6 @@ bool solve(int argc, char* argv[], psopt::MultiSegmentData & msdata, psopt::Solv
         vehicleParam = nullptr;
         problem = nullptr;
         return false;
-    }
-    if (overtaking_case == 2)
-    {
-        info->setPhaseLowerBoundEndTime(3.0, msdata.nsegments - 1);
-        info->setPhaseUpperBoundEndTime(3.0, msdata.nsegments - 1);
-    }
-    else if (overtaking_case == 1)
-    {
-        info->setPhaseLowerBoundEndTime(2.0, msdata.nsegments - 1);
-        info->setPhaseUpperBoundEndTime(2.0, msdata.nsegments - 1);
-    }
-    else
-    {
-        info->setPhaseLowerBoundEndTime(1.5, msdata.nsegments - 1);
-        info->setPhaseUpperBoundEndTime(1.5, msdata.nsegments - 1);
     }
 
     int nobstacle = 1;
@@ -226,7 +208,7 @@ bool solve(int argc, char* argv[], psopt::MultiSegmentData & msdata, psopt::Solv
         return false;
     }
 
-    int trial = 1;
+    int trial = 0;
     // info->setUseLinearizedDae(true); // TODO
     for (int i = 0; i < trial; i++)
     {
@@ -244,75 +226,6 @@ bool solve(int argc, char* argv[], psopt::MultiSegmentData & msdata, psopt::Solv
             return false;
         }
     }
-
-    /*
-    // trajectory 
-    std::vector<double> trajx, trajy, trajt, trajalpha, trajv, trajomega;
-    const double * states = solver.getPhaseStates().data();
-    const double * controls = solver.getPhaseControls().data();
-    for (std::size_t j = 0; j < expected_nnodes; j++)
-    {
-        trajx.push_back(states[0]);
-        trajy.push_back(states[1]);
-        trajt.push_back(states[2]);
-        trajalpha.push_back(states[3]);
-        trajv.push_back(controls[0]);
-        trajomega.push_back(controls[1]);
-        states += msdata.nstates;
-        controls += msdata.ncontrols;
-    }
-
-    // interpolation
-    std::vector<double> vtime = info->getNodes(expected_nnodes - 1);
-    expected_nnodes = 80; // TODO
-    std::vector<double> ptime = info->getNodes(expected_nnodes - 1);
-    psopt::LinearInterpolation<double, double> linearInterp(vtime, ptime);
-    std::vector<double> interp_trajx = linearInterp.interpolate(trajx);
-    std::vector<double> interp_trajy = linearInterp.interpolate(trajy);
-    std::vector<double> interp_trajt = linearInterp.interpolate(trajt);
-    std::vector<double> interp_trajalpha = linearInterp.interpolate(trajalpha);
-    std::vector<double> interp_trajv = linearInterp.interpolate(trajv);
-    std::vector<double> interp_trajomega = linearInterp.interpolate(trajomega);
-    std::vector<double> interp_time = linearInterp.interpolate(solver.getPhaseTime());
-
-    std::size_t p = 30;
-    msdata.nsegments = expected_nnodes / p;
-    if (expected_nnodes % p != 0) msdata.nsegments += 1;
-    // msdata.nsegments = 1; // TODO
-    std::size_t nmod = expected_nnodes / msdata.nsegments;
-    std::vector<std::size_t> nnodes(msdata.nsegments, nmod);
-    nnodes.back() = expected_nnodes - (msdata.nsegments - 1) * (nmod - 1);
-    msdata.nnodes.swap(nnodes);
-
-    std::size_t start = 0;
-    solver.setPhaseNumbers(msdata.nsegments);
-    for (std::size_t k = 0; k < msdata.nsegments; k++)
-    {
-        std::vector<double> guess_states, guess_controls, guess_time;
-        guess_states.reserve(msdata.nstates * msdata.nnodes[k]);
-        guess_controls.reserve(msdata.ncontrols * msdata.nnodes[k]);
-        guess_time.reserve(msdata.nnodes[k]);
-        for (std::size_t i = 0; i < msdata.nnodes[k]; i++)
-        {
-            std::size_t offset = start + i;
-            guess_states.push_back(interp_trajx[offset]);
-            guess_states.push_back(interp_trajy[offset]);
-            guess_states.push_back(interp_trajt[offset]);
-            guess_states.push_back(interp_trajalpha[offset]);
-            guess_controls.push_back(interp_trajv[offset]);
-            guess_controls.push_back(interp_trajomega[offset]);
-            guess_time.push_back(interp_time[offset]);
-            for (std::size_t j = 4; j < msdata.nstates; j++)
-                guess_states.push_back(0.0);
-            for (std::size_t j = 2; j < msdata.ncontrols; j++)
-                guess_controls.push_back(0.0);
-        }
-        start += (msdata.nnodes[k] - 1);
-        solver.setPhaseStates(guess_states, k);
-        solver.setPhaseControls(guess_controls, k);
-        solver.setPhaseTime(guess_time, k);
-    }
-    */
 
     timeUsed = ompl::time::seconds(ompl::time::now() - timeStart);
     OMPL_INFORM("Time used %.4f", timeUsed);

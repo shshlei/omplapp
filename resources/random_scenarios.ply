@@ -1,6 +1,12 @@
 # Random 2D scenarios with circle, polygon, ellipse, capsule and rectangle shapes
 # (feel free to add / change comments, but leave the first line as it is!)
 #
+# 0: circle, 1: polygon, 2: ellipse, 3: capsule, 4: rectangle
+# circle: 0 xc yc radius
+# polygon: 1 count x1 y1 x2 y2 ...
+# ellipse: 2 xc yc yaw h_a h_b
+# capsule: 3 xc yc yaw r h
+# rectangle: 4 xc yc yaw h_a h_b
 numbers 215
 shapes
 0 0.526014 0.186141 0.026524

@@ -36,12 +36,8 @@
 
 #include "ParkingPureSampling.h" 
 
-#include <box2d_collision/b2_math.h>
-#include <box2d_collision/b2_distance.h>
-#include <box2d_collision/b2_bvh_manager.h>
-
-#include <psopt/problem.hpp>
-#include <psopt/solver.hpp>
+#include <psopt/optimal_control_problem.hpp>
+#include <psopt/optimal_control_solver.hpp>
 #include <psopt/interpolation.hpp>
 
 #include <bomp/utils.hpp>
@@ -57,13 +53,13 @@ class FourScenariosProblemMJ2 : public VehicleBasicModel<Scalar, Scalar2>
 {
 public:
 
-    FourScenariosProblemMJ2(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, bool forward = true) : VehicleBasicModel<Scalar, Scalar2>(prob, vehicleParam), forward_(forward)
+    FourScenariosProblemMJ2(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, bool forward = true) : VehicleBasicModel<Scalar, Scalar2>(prob, vehicleParam), forward_(forward)
     {
     }
 
     virtual ~FourScenariosProblemMJ2() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         FourScenariosProblemMJ2<adouble, Scalar2>* prob = new FourScenariosProblemMJ2<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_, this->forward_);
         prob->setLinearizedParameters(this);
@@ -99,13 +95,19 @@ private:
 
 int main(int argc, char* argv[])
 {
+    bool parking_forward;
+    int parking_scenario;
+    int parking_case;
+    std::size_t expected_nnodes;
+    // Parse the arguments, returns true if successful, false otherwise
+    if (!argParse(argc, argv, parking_forward, parking_scenario, parking_case, expected_nnodes)) return -1;
+
     std::shared_ptr<app::Box2dStateValidityChecker> svc;
-    bool parking_forward = false;
     double x0, y0, theta0;
     std::vector<double> trajx, trajy, trajt;
     double sampling_time;
-    if (!solve(argc, argv, svc, parking_scenario, parking_forward, x0, y0, theta0, trajx, trajy, trajt, sampling_time)) return -1;
-    std::size_t expected_nnodes = trajx.size();
+    if (!solve(parking_forward, parking_scenario, parking_case, expected_nnodes, svc, x0, y0, theta0, trajx, trajy, trajt, sampling_time)) return -1;
+    expected_nnodes = trajx.size();
 
     int nobstacle = 2;
     if (parking_scenario == 3)
@@ -131,14 +133,14 @@ int main(int argc, char* argv[])
     std::vector<std::size_t> nnodes(msdata.nsegments, nmod);
     nnodes.back() = expected_nnodes - (msdata.nsegments - 1) * (nmod - 1);
     msdata.nnodes.swap(nnodes);
-    psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+    psopt::OptimalControlProblemInfo<double>* info = new psopt::OptimalControlProblemInfo<double>(msdata);
     info->setLinearSolver("ma57");
     info->setTolerance(1.e-8);
 
     VehicleParam<double> *vehicleParam = new VehicleParam<double>(2.8, 0.96, 0.929, 1.942);
     FourScenariosProblemMJ2<double>* problem = new FourScenariosProblemMJ2<double>(info, vehicleParam, parking_forward);
 
-    four_scenarios_bounds(info, vehicleParam, parking_forward, x0, y0, theta0);
+    four_scenarios_bounds(info, vehicleParam, parking_forward, parking_scenario, x0, y0, theta0);
     info->setPhaseLowerBoundStartTime(0.0);
     info->setPhaseUpperBoundStartTime(0.0);
     info->setPhaseLowerBoundEndTime(2.0);
@@ -189,7 +191,7 @@ int main(int argc, char* argv[])
     }
 
     std::ofstream ofs;
-    ofs.open("pathsol_interp.txt"); // TODO delete
+    ofs.open("pathsol_interp.txt");
     for (std::size_t i = 0; i < expected_nnodes; i++)
     {
         ofs << interp_trajx[i] << " " << interp_trajy[i] << " " << interp_trajt[i] << std::endl;
@@ -229,13 +231,13 @@ int main(int argc, char* argv[])
 
     double eps = 0.1;
     double Jeps = 0.05;
-    bounds_J_2_KKT_Norm_2D(info, nobstacle, 8, 3, eps, Jeps);
+    psopt::bounds_J_2_KKT_Norm_2D(info, nobstacle, 8, 3, eps, Jeps);
 
     rect1 << 0.5 * vehicleParam->L, 0.5 * vehicleParam->L, -0.5 * vehicleParam->L, -0.5 * vehicleParam->L, 
              0.5 * vehicleParam->W, -0.5 * vehicleParam->W, -0.5 * vehicleParam->W, 0.5 * vehicleParam->W; 
-    obstacles = generate_obstacles(vehicleParam);
+    obstacles = generate_obstacles(vehicleParam, parking_scenario);
 
-    psopt::Solver<double> solver;
+    psopt::OptimalControlSolver<double> solver;
     bool success = solver.solve(problem); // solve with first obstacles
     if (success)
     {

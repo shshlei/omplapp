@@ -36,6 +36,8 @@
 
 #include "OvertakingStageOne.h" 
 
+#include <bomp/collision_constraints/active_collision_constraints.h>
+
 #include <box2d_collision/b2_distance.h>
 #include <box2d_collision/b2_bvh_manager.h>
 
@@ -179,14 +181,14 @@ class OvertakingProblemBox : public OvertakingProblemBase<Scalar, Scalar2>
 {
 public:
 
-    OvertakingProblemBox(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, const VehicleCircleParam<Scalar2>* vehicleCircleParam) : OvertakingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
+    OvertakingProblemBox(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, const VehicleCircleParam<Scalar2>* vehicleCircleParam) : OvertakingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
     {
         vehicleCircleParam_ = vehicleCircleParam;
     }
 
     virtual ~OvertakingProblemBox() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         OvertakingProblemBox<adouble, Scalar2>* prob = new OvertakingProblemBox<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_, this->vehicleCircleParam_);
         prob->setLinearizedParameters(this);
@@ -301,13 +303,13 @@ class OvertakingProblemBoxAp : public OvertakingProblemBase<Scalar, Scalar2>
 {
 public:
 
-    OvertakingProblemBoxAp(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : OvertakingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
+    OvertakingProblemBoxAp(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : OvertakingProblemBase<Scalar, Scalar2>(prob, vehicleParam)
     {
     }
 
     virtual ~OvertakingProblemBoxAp() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         OvertakingProblemBoxAp<adouble, Scalar2>* prob = new OvertakingProblemBoxAp<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_);
         prob->setActivePoints(activePoints_);
@@ -348,7 +350,7 @@ public:
             const Scalar theta = cstates[2];
             Eigen::Matrix<Scalar, 2, 3> invtransform = invtransform_2D(x, y, theta);
             invtransform(0, 2) -= this->vehicleParam_->delta;
-            MJ_2_Active_Constraints_2D(paths + offset, invtransform, apoints.activePoints);
+            active_Constraints_2D(paths + offset, invtransform, apoints.activePoints);
             offset += apoints.activePoints.size();
         }
     }
@@ -366,7 +368,7 @@ int main(int argc, char* argv[])
     {
         std::cout << "Iteration " << iteration << std::endl;
         psopt::MultiSegmentData msdata;
-        psopt::Solver<double> solver;
+        psopt::OptimalControlSolver<double> solver;
         double stage1_time;
         if (!solve(argc, argv, msdata, solver, stage1_time)) continue;
 
@@ -375,7 +377,7 @@ int main(int argc, char* argv[])
         {
             ompl::time::point timeStart = ompl::time::now();
 
-            psopt::ProblemInfo<double> * info = new psopt::ProblemInfo<double>(msdata);
+            psopt::OptimalControlProblemInfo<double> * info = new psopt::OptimalControlProblemInfo<double>(msdata);
             info->setLinearSolver("ma57");
             info->setTolerance(1.e-8);
             info->setPathsAlongTrajectory(false);
@@ -392,21 +394,6 @@ int main(int argc, char* argv[])
                 info->setPhaseUpperBoundStartTime(10.0, i);
                 info->setPhaseLowerBoundEndTime(0.0, i);
                 info->setPhaseUpperBoundEndTime(10.0, i);
-            }
-            if (overtaking_case == 2)
-            {
-                info->setPhaseLowerBoundEndTime(3.0, msdata.nsegments - 1);
-                info->setPhaseUpperBoundEndTime(3.0, msdata.nsegments - 1);
-            }
-            else if (overtaking_case == 1)
-            {
-                info->setPhaseLowerBoundEndTime(2.0, msdata.nsegments - 1);
-                info->setPhaseUpperBoundEndTime(2.0, msdata.nsegments - 1);
-            }
-            else
-            {
-                info->setPhaseLowerBoundEndTime(1.5, msdata.nsegments - 1);
-                info->setPhaseUpperBoundEndTime(1.5, msdata.nsegments - 1);
             }
 
             for (std::size_t j = 0; j < msdata.nsegments; j++)
@@ -434,7 +421,7 @@ int main(int argc, char* argv[])
             else if (overtaking_case == 0)
             {
                 b2Transform oxf = b2Transform::Identity();
-                oxf.translation().x() = 10.0 + vehicleParam->delta; // overtaking_case == 0
+                oxf.translation().x() = overtaking_dist1 + vehicleParam->delta; // overtaking_case == 0
                 svc->SetBodyTransform(obs_name1, oxf);
             }
 
@@ -463,7 +450,7 @@ int main(int argc, char* argv[])
                         if (overtaking_case > 0)
                         {
                             b2Transform oxf = b2Transform::Identity();
-                            oxf.translation().x() = 10.0 + vehicleParam->delta + 10.0 * time[i]; // overtaking_case 1 
+                            oxf.translation().x() = overtaking_dist1 + vehicleParam->delta + overtaking_speed * time[i]; // overtaking_case 1 
                             svc->SetBodyTransform(obs_name1, oxf);
                             if (overtaking_case == 2)
                             {
@@ -576,7 +563,7 @@ int main(int argc, char* argv[])
 
             ompl::time::point timeStart = ompl::time::now();
 
-            psopt::ProblemInfo<double> * info = new psopt::ProblemInfo<double>(msdata);
+            psopt::OptimalControlProblemInfo<double> * info = new psopt::OptimalControlProblemInfo<double>(msdata);
             info->setLinearSolver("ma57");
             info->setTolerance(1.e-8);
             info->setPathsAlongTrajectory(false);
@@ -593,21 +580,6 @@ int main(int argc, char* argv[])
                 info->setPhaseUpperBoundStartTime(10.0, i);
                 info->setPhaseLowerBoundEndTime(0.0, i);
                 info->setPhaseUpperBoundEndTime(10.0, i);
-            }
-            if (overtaking_case == 2)
-            {
-                info->setPhaseLowerBoundEndTime(3.0, msdata.nsegments - 1);
-                info->setPhaseUpperBoundEndTime(3.0, msdata.nsegments - 1);
-            }
-            else if (overtaking_case == 1)
-            {
-                info->setPhaseLowerBoundEndTime(2.0, msdata.nsegments - 1);
-                info->setPhaseUpperBoundEndTime(2.0, msdata.nsegments - 1);
-            }
-            else
-            {
-                info->setPhaseLowerBoundEndTime(1.5, msdata.nsegments - 1);
-                info->setPhaseUpperBoundEndTime(1.5, msdata.nsegments - 1);
             }
 
             for (std::size_t j = 0; j < msdata.nsegments; j++)
@@ -633,7 +605,7 @@ int main(int argc, char* argv[])
             else if (overtaking_case == 0)
             {
                 b2Transform oxf = b2Transform::Identity();
-                oxf.translation().x() = 10.0 + vehicleParam->delta; // overtaking_case == 0
+                oxf.translation().x() = overtaking_dist1 + vehicleParam->delta; // overtaking_case == 0
                 svc->SetBodyTransform(obs_name1, oxf);
             }
 
@@ -674,7 +646,7 @@ int main(int argc, char* argv[])
                         if (overtaking_case > 0)
                         {
                             b2Transform oxf = b2Transform::Identity();
-                            oxf.translation().x() = 10.0 + vehicleParam->delta + 10.0 * time[i]; // overtaking_case 1 
+                            oxf.translation().x() = overtaking_dist1 + vehicleParam->delta + overtaking_speed * time[i]; // overtaking_case 1 
                             svc->SetBodyTransform(obs_name1, oxf);
                             if (overtaking_case == 2)
                             {
@@ -758,7 +730,7 @@ int main(int argc, char* argv[])
                             if (overtaking_case > 0)
                             {
                                 b2Transform oxf = b2Transform::Identity();
-                                oxf.translation().x() = 10.0 + vehicleParam->delta + 10.0 * time[i]; // overtaking_case 1 
+                                oxf.translation().x() = overtaking_dist1 + vehicleParam->delta + overtaking_speed * time[i]; // overtaking_case 1 
                                 svc->SetBodyTransform(obs_name1, oxf);
                                 if (overtaking_case == 2)
                                 {

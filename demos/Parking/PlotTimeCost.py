@@ -44,64 +44,28 @@ import numpy as np
 if __name__ == "__main__":
     # Create an argument parser
     parser = argparse.ArgumentParser(description='Draw Trajectory.')
-    parser.add_argument('-s', '--scenario', default=0, help='Scenario.')
-    parser.add_argument('-c', '--cases', default=0, help='Cases.')
+    parser.add_argument('-t', '--time', default=None, help='Filename of the time cost.')
     args = parser.parse_args()
 
-    line = open(str('TimeCost/mj_time_'+str(args.scenario)+'_'+str(args.cases)+'.txt'), 'r').readline()
-    line = line.strip()
-    mj_time = [float(x) for x in line.split(' ')]
+    time_cost = []
+    if args.time:
+        for line in open(args.time, 'r').readlines():
+            line = line.strip()
+            if not line:
+                continue
+            state = [float(x) for x in line.split(' ')]
+            time_cost.append(state)
 
-    line = open(str('TimeCost/mj_cost_'+str(args.scenario)+'_'+str(args.cases)+'.txt'), 'r').readline()
-    line = line.strip()
-    mj_costs = [float(x) for x in line.split(' ')]
+        time_cost = np.array(time_cost).T
+        samping_time = time_cost[0]
+        opti_time = time_cost[1]
+        cost = time_cost[2]
 
-    ac_time = []
-    line = open(str('TimeCost/ac_time_'+str(args.scenario)+'_'+str(args.cases)+'.txt'), 'r').readline()
-    line = line.strip()
-    ac_time = [float(x) for x in line.split(' ')]
+        print('sol percentage {}'.format(len(samping_time)))
 
-    line = open(str('TimeCost/ac_cost_'+str(args.scenario)+'_'+str(args.cases)+'.txt'), 'r').readline()
-    line = line.strip()
-    ac_costs = [float(x) for x in line.split(' ')]
-
-    line = open(str('TimeCost/duald_time_'+str(args.scenario)+'_'+str(args.cases)+'.txt'), 'r').readline()
-    line = line.strip()
-    duald_time = [float(x) for x in line.split(' ')]
-
-    line = open(str('TimeCost/duald_cost_'+str(args.scenario)+'_'+str(args.cases)+'.txt'), 'r').readline()
-    line = line.strip()
-    duald_costs = [float(x) for x in line.split(' ')]
-
-    line = open(str('TimeCost/dualmj_time_'+str(args.scenario)+'_'+str(args.cases)+'.txt'), 'r').readline()
-    line = line.strip()
-    dualmj_time = [float(x) for x in line.split(' ')]
-
-    line = open(str('TimeCost/dualmj_cost_'+str(args.scenario)+'_'+str(args.cases)+'.txt'), 'r').readline()
-    line = line.strip()
-    dualmj_costs = [float(x) for x in line.split(' ')]
-
-    print('MJ2')
-    meant = np.mean(mj_time[0])
-    print('mj mean time {}'.format(meant))
-    meanc = np.mean(mj_costs)
-    print('mj mean cost {}'.format(meanc))
-
-    print('AC')
-    meant = np.mean(ac_time[0])
-    print('ac mean time {}'.format(meant))
-    meanc = np.mean(ac_costs)
-    print('ac mean cost {}'.format(meanc))
-
-    print('DualD')
-    meant = np.mean(duald_time[0])
-    print('duald mean time {}'.format(meant))
-    meanc = np.mean(duald_costs)
-    print('duald mean cost {}'.format(meanc))
-
-    print('DualMJ')
-    meant = np.mean(dualmj_time[0])
-    print('dualmj mean time {}'.format(meant))
-    meanc = np.mean(dualmj_costs)
-    print('dualmj mean cost {}'.format(meanc))
-
+        meant = np.mean(samping_time)
+        print('mean samping time {}'.format(meant))
+        meant = np.mean(opti_time)
+        print('mean optimization time {}'.format(meant))
+        meanc = np.mean(cost)
+        print('mean cost {}'.format(meanc))

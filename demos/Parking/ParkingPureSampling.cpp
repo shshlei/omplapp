@@ -38,13 +38,18 @@
 
 int main(int argc, char* argv[])
 {
-    std::shared_ptr<app::Box2dStateValidityChecker> svc;
+    bool parking_forward;
     int parking_scenario;
-    bool parking_forward = false;
+    int parking_case;
+    std::size_t expected_nnodes;
+    // Parse the arguments, returns true if successful, false otherwise
+    if (!argParse(argc, argv, parking_forward, parking_scenario, parking_case, expected_nnodes)) return -1;
+
+    std::shared_ptr<app::Box2dStateValidityChecker> svc;
     double x0, y0, theta0;
     std::vector<double> trajx, trajy, trajt;
     double sampling_time;
-    if (!solve(argc, argv, svc, parking_scenario, parking_forward, x0, y0, theta0, trajx, trajy, trajt, sampling_time)) return -1;
+    if (!solve(parking_forward, parking_scenario, parking_case, expected_nnodes, svc, x0, y0, theta0, trajx, trajy, trajt, sampling_time)) return -1;
     OMPL_INFORM("Sampling time %0.4f", sampling_time);
     return 0;
 }

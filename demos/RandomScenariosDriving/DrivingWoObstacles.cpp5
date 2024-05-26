@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     }
     else
         msdata.nnodes.push_back(expected_nnodes);
-    psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+    psopt::OptimalControlProblemInfo<double>* info = new psopt::OptimalControlProblemInfo<double>(msdata);
     info->setLinearSolver("ma57");
     info->setTolerance(1.e-8);
 
@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
     VehicleParam<double> *vehicleParam = new VehicleParam<double>(0.028, 0.0096, 0.00929, 0.01942);
     DrivingProblemBase<double>* problem = new DrivingProblemBase<double>(info, vehicleParam);
 
-    psopt::Solver<double> solver;
+    psopt::OptimalControlSolver<double> solver;
     if (solver.solve(problem))
     {
         std::ofstream ofs;

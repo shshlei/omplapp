@@ -38,24 +38,32 @@ if (OMPL_BUILD_DEMOS)
     add_omplapp_demo(demo_ParkingAC Parking/ParkingAC.cpp)
     target_link_libraries(demo_ParkingAC adolc PkgConfig::ipopt)
 
+    add_omplapp_demo(demo_ParkingACTime Parking/ParkingACTime.cpp)
+    target_link_libraries(demo_ParkingACTime adolc PkgConfig::ipopt)
+
     add_omplapp_demo(demo_ParkingMJ2 Parking/ParkingMJ2.cpp)
     target_link_libraries(demo_ParkingMJ2 adolc PkgConfig::ipopt)
-    #add_omplapp_demo(demo_ParkingActivePoints Parking/ParkingActivePoints.cpp)
+
+    add_omplapp_demo(demo_ParkingMJ2Time Parking/ParkingMJ2Time.cpp)
+    target_link_libraries(demo_ParkingMJ2Time adolc PkgConfig::ipopt)
 
     add_omplapp_demo(demo_ParkingDualDistance Parking/ParkingDualDistance.cpp)
     target_link_libraries(demo_ParkingDualDistance adolc PkgConfig::ipopt)
 
+    add_omplapp_demo(demo_ParkingDualDistanceTime Parking/ParkingDualDistanceTime.cpp)
+    target_link_libraries(demo_ParkingDualDistanceTime adolc PkgConfig::ipopt)
+
     add_omplapp_demo(demo_ParkingDualMJ2 Parking/ParkingDualMJ2.cpp)
     target_link_libraries(demo_ParkingDualMJ2 adolc PkgConfig::ipopt)
 
-    add_omplapp_demo(demo_ParkingMJ2Initial Parking/ParkingMJ2Initial.cpp)
-    target_link_libraries(demo_ParkingMJ2Initial adolc PkgConfig::ipopt)
+    add_omplapp_demo(demo_ParkingDualMJ2Time Parking/ParkingDualMJ2Time.cpp)
+    target_link_libraries(demo_ParkingDualMJ2Time adolc PkgConfig::ipopt)
 
-    add_omplapp_demo(demo_ParkingMJ2InitialWoDynamics Parking/ParkingMJ2InitialWoDynamics.cpp)
-    target_link_libraries(demo_ParkingMJ2InitialWoDynamics adolc PkgConfig::ipopt)
+    add_omplapp_demo(demo_ParkingDualMJ2_2 Parking/ParkingDualMJ2_2.cpp)
+    target_link_libraries(demo_ParkingDualMJ2_2 adolc PkgConfig::ipopt)
 
-    add_omplapp_demo(demo_ParkingCompare Parking/ParkingCompare.cpp)
-    target_link_libraries(demo_ParkingCompare adolc PkgConfig::ipopt)
+    add_omplapp_demo(demo_ParkingDualMJ2_2Time Parking/ParkingDualMJ2_2Time.cpp)
+    target_link_libraries(demo_ParkingDualMJ2_2Time adolc PkgConfig::ipopt)
 
     add_omplapp_demo(demo_DifferentialDriving DifferentialDriving/DifferentialDriving.cpp)
     target_link_libraries(demo_DifferentialDriving adolc PkgConfig::ipopt)
@@ -76,7 +84,6 @@ if (OMPL_BUILD_DEMOS)
     target_link_libraries(demo_DrivingBoxCompare adolc PkgConfig::ipopt)
     add_omplapp_demo(demo_DrivingBoxCompareAABB RandomScenariosDriving/DrivingBoxCompareAABB.cpp)
     target_link_libraries(demo_DrivingBoxCompareAABB adolc PkgConfig::ipopt)
-    add_omplapp_demo(demo_DrivingActivePoints RandomScenariosDriving/DrivingActivePoints.cpp)
     add_omplapp_demo(demo_DrivingPureSampling RandomScenariosDriving/DrivingPureSampling.cpp)
 
     add_omplapp_demo(demo_OvertakingBox Overtaking/OvertakingBox.cpp)
@@ -131,6 +138,8 @@ if (OMPL_BUILD_DEMOS)
 
     add_omplapp_demo(demo_RandomPolygonCircles RandomPolygonCircles/RandomPolygonCirclesPlanning.cpp RandomPolygonCircles/NaiveConnect.h RandomPolygonCircles/NaiveConnect.cpp)
     add_omplapp_demo(demo_RandomPolygonCirclesBenchmark RandomPolygonCircles/RandomPolygonCirclesBenchmark.cpp)
+    add_omplapp_demo(demo_SimpleBenchmark RandomPolygonCircles/SimpleBenchmark.cpp)
+
     add_omplapp_demo(demo_RealVector2RigidBodyPlanning RealVector2RigidBodyPlanning/RealVector2RigidBodyPlanning.cpp)
     add_omplapp_demo(demo_NarrowPassages RealVector2RigidBodyPlanning/NarrowPassages.cpp)
     add_omplapp_demo(demo_NarrowPassagesBenchmark RealVector2RigidBodyPlanning/NarrowPassagesBenchmark.cpp)

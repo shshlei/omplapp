@@ -36,8 +36,8 @@
 
 #include "ParkingPureSampling.h" 
 
-#include <psopt/problem.hpp>
-#include <psopt/solver.hpp>
+#include <psopt/optimal_control_problem.hpp>
+#include <psopt/optimal_control_solver.hpp>
 
 #include <bomp/utils.hpp>
 #include <bomp/vehicle_basic_model/vehicle_basic_model.hpp>
@@ -52,13 +52,13 @@ class FourScenariosProblemAreaCriterion : public VehicleBasicModel<Scalar, Scala
 {
 public:
 
-    FourScenariosProblemAreaCriterion(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : VehicleBasicModel<Scalar, Scalar2>(prob, vehicleParam)
+    FourScenariosProblemAreaCriterion(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam) : VehicleBasicModel<Scalar, Scalar2>(prob, vehicleParam)
     {
     }
 
     virtual ~FourScenariosProblemAreaCriterion() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         FourScenariosProblemAreaCriterion<adouble, Scalar2>* prob = new FourScenariosProblemAreaCriterion<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_);
         prob->setLinearizedParameters(this);
@@ -91,13 +91,19 @@ public:
 
 int main(int argc, char* argv[])
 {
+    bool parking_forward;
+    int parking_scenario;
+    int parking_case;
+    std::size_t expected_nnodes;
+    // Parse the arguments, returns true if successful, false otherwise
+    if (!argParse(argc, argv, parking_forward, parking_scenario, parking_case, expected_nnodes)) return -1;
+
     std::shared_ptr<app::Box2dStateValidityChecker> svc;
-    bool parking_forward = false;
     double x0, y0, theta0;
     std::vector<double> trajx, trajy, trajt;
     double sampling_time;
-    if (!solve(argc, argv, svc, parking_scenario, parking_forward, x0, y0, theta0, trajx, trajy, trajt, sampling_time)) return -1;
-    std::size_t expected_nnodes = trajx.size();
+    if (!solve(parking_forward, parking_scenario, parking_case, expected_nnodes, svc, x0, y0, theta0, trajx, trajy, trajt, sampling_time)) return -1;
+    expected_nnodes = trajx.size();
 
     int nobstacle = 2;
     if (parking_scenario == 3)
@@ -116,21 +122,21 @@ int main(int argc, char* argv[])
     msdata.npaths = 8 * nobstacle;
     msdata.continuous_controls = true;
     msdata.paths_along_trajectory = true;
-    msdata.parameters_along_trajectory = true;
+    msdata.parameters_along_trajectory = false;
     msdata.treat_dynamics_as_cost = false;
 
     std::size_t nmod = expected_nnodes / msdata.nsegments;
     std::vector<std::size_t> nnodes(msdata.nsegments, nmod);
     nnodes.back() = expected_nnodes - (msdata.nsegments - 1) * (nmod - 1);
     msdata.nnodes.swap(nnodes);
-    psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+    psopt::OptimalControlProblemInfo<double>* info = new psopt::OptimalControlProblemInfo<double>(msdata);
     info->setLinearSolver("ma57");
     info->setTolerance(1.e-8);
 
     VehicleParam<double>* vehicleParam = new VehicleParam<double>(2.8, 0.96, 0.929, 1.942);
     FourScenariosProblemAreaCriterion<double>* problem = new FourScenariosProblemAreaCriterion<double>(info, vehicleParam);
 
-    four_scenarios_bounds(info, vehicleParam, parking_forward, x0, y0, theta0);
+    four_scenarios_bounds(info, vehicleParam, parking_forward, parking_scenario, x0, y0, theta0);
     info->setPhaseLowerBoundStartTime(0.0);
     info->setPhaseUpperBoundStartTime(0.0);
     info->setPhaseLowerBoundEndTime(2.0);
@@ -168,7 +174,7 @@ int main(int argc, char* argv[])
     }
 
     std::ofstream ofs;
-    ofs.open("pathsol_interp.txt"); // TODO delete
+    ofs.open("pathsol_interp.txt");
     for (std::size_t i = 0; i < expected_nnodes; i++)
     {
         ofs << interp_trajx[i] << " " << interp_trajy[i] << " " << interp_trajt[i] << std::endl;
@@ -206,10 +212,10 @@ int main(int argc, char* argv[])
     interp_trajv.clear();
     interp_trajomega.clear();
 
-    psopt::Solver<double> solver;
+    psopt::OptimalControlSolver<double> solver;
     for (std::size_t j = 0; j < msdata.nsegments; j++)
     {
-        info->setPhaseConstantLowerBoundPaths(0.025, j);
+        info->setPhaseConstantLowerBoundPaths(0.05, j);
         info->setPhaseInfinityUpperBoundPaths(j);
     }
 
@@ -219,7 +225,7 @@ int main(int argc, char* argv[])
     else
         rect1 << vehicleParam->l2, vehicleParam->l2, -vehicleParam->l1 - vehicleParam->l, -vehicleParam->l1 - vehicleParam->l, 
                  0.5 * vehicleParam->W, -0.5 * vehicleParam->W, -0.5 * vehicleParam->W, 0.5 * vehicleParam->W;
-    obstacles = generate_obstacles(vehicleParam);
+    obstacles = generate_obstacles(vehicleParam, parking_scenario);
     // info->setUseLinearizedDae(true);
     // problem->setUpLinearizedParameters(info->getVariables().data());
     bool success = solver.solve(problem);

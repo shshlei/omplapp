@@ -34,23 +34,23 @@
 
 /* Author: Shi Shenglei */
 
-#include <psopt/problem.hpp>
+#include <psopt/optimal_control_problem.hpp>
 #include <bomp/utils.hpp>
 //#include <bomp/collision_constraints/J_function_collision_constraints.h>
-#include <bomp/collision_constraints/active_points_collision_constraints.h>
+#include <bomp/collision_constraints/active_collision_constraints.h>
 
 template <typename Scalar = double, typename Scalar2 = Scalar>
-class DifferentialDriving : public psopt::Problem<Scalar, Scalar2>
+class DifferentialDriving : public psopt::OptimalControlProblem<Scalar, Scalar2>
 {
 public:
 
-  DifferentialDriving(psopt::ProblemInfo<Scalar2>* prob) : psopt::Problem<Scalar, Scalar2>(prob)
+  DifferentialDriving(psopt::OptimalControlProblemInfo<Scalar2>* prob) : psopt::OptimalControlProblem<Scalar, Scalar2>(prob)
   {
   }
 
   virtual ~DifferentialDriving() = default;
 
-  psopt::Problem<adouble, Scalar2>* clone() const override
+  psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
   {
     DifferentialDriving<adouble, Scalar2>* prob = new DifferentialDriving<adouble, Scalar2>(this->problemInfo_);
     prob->setActivePoints(activePoints_);
@@ -118,7 +118,7 @@ public:
       const Scalar y = cstates[1];
       const Scalar theta = cstates[2];
       Eigen::Matrix<Scalar, 2, 3> invtransform = invtransform_2D(x, y, theta);
-      MJ_2_Active_Constraints_2D(paths + offset, invtransform, apoints.activePoints);
+      active_Constraints_2D(paths + offset, invtransform, apoints.activePoints);
       offset += apoints.activePoints.size();
     }
   }

@@ -1,8 +1,12 @@
 # Random polygons and circles file
 # (feel free to add / change comments, but leave the first line as it is!)
 #
-#
-#1 4 0.4 0.3 0.6 0.3 0.6 0.7 0.4 0.7
+# 0: circle, 1: polygon, 2: ellipse, 3: capsule, 4: rectangle
+# circle: 0 xc yc radius
+# polygon: 1 count x1 y1 x2 y2 ...
+# ellipse: 2 xc yc yaw h_a h_b
+# capsule: 3 xc yc yaw r h
+# rectangle: 4 xc yc yaw h_a h_b
 numbers 207
 shapes
 0 0.526014 0.186141 0.026524

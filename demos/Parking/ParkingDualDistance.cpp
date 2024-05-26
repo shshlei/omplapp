@@ -36,15 +36,15 @@
 
 #include "ParkingPureSampling.h" 
 
-#include <psopt/problem.hpp>
-#include <psopt/solver.hpp>
-#include <psopt/interpolation.hpp>
+#include <psopt/optimal_control_problem.hpp>
+#include <psopt/optimal_control_solver.hpp>
 
 #include <bomp/utils.hpp>
 #include <bomp/vehicle_basic_model/vehicle_basic_model.hpp>
 #include <bomp/collision_constraints/dual_distance_collision_constraints.h>
 #include <bomp/four_scenarios_parking/four_scenarios_basic_setup.hpp>
 
+Eigen::Matrix<double, 2, 1> rect1, rect2;
 std::vector<Eigen::Matrix<double, 2, 3>> obstacles;
 
 template <typename Scalar = double, typename Scalar2 = Scalar>
@@ -52,13 +52,13 @@ class FourScenariosProblemDualDistance : public VehicleBasicModel<Scalar, Scalar
 {
 public:
 
-    FourScenariosProblemDualDistance(psopt::ProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, bool forward = true) : VehicleBasicModel<Scalar, Scalar2>(prob, vehicleParam), forward_(forward)
+    FourScenariosProblemDualDistance(psopt::OptimalControlProblemInfo<Scalar2>* prob, const VehicleParam<Scalar2>* vehicleParam, bool forward = true) : VehicleBasicModel<Scalar, Scalar2>(prob, vehicleParam), forward_(forward)
     {
     }
 
     virtual ~FourScenariosProblemDualDistance() = default;
 
-    psopt::Problem<adouble, Scalar2>* clone() const override
+    psopt::OptimalControlProblem<adouble, Scalar2>* clone() const override
     {
         FourScenariosProblemDualDistance<adouble, Scalar2>* prob = new FourScenariosProblemDualDistance<adouble, Scalar2>(this->problemInfo_, this->vehicleParam_, this->forward_);
         prob->setLinearizedParameters(this);
@@ -80,20 +80,12 @@ public:
         else
             invtransform(0, 2) += this->vehicleParam_->delta;
 
-        Eigen::Matrix<Scalar2, 2, 1> rect1(0.5 * this->vehicleParam_->L, 0.5 * this->vehicleParam_->W);
-        Eigen::Matrix<Scalar2, 2, 1> rect2 = rect1;
-        if (parking_scenario == 2)
-        {
-            rect2[0] = 0.5 * this->vehicleParam_->W;
-            rect2[1] = 0.5 * this->vehicleParam_->L;
-        }
-
         for (std::size_t i = 0; i < obstacles.size(); i++)
         {
             Eigen::Matrix<Scalar, 2, 3> transform = obstacles[i].template cast<Scalar>();
-            Eigen::Matrix<Scalar, 2, 2> invR2 = invtransform.topLeftCorner(2, 2) * transform.topLeftCorner(2, 2);
-            Eigen::Matrix<Scalar, 2, 1> invT2 = invtransform.topLeftCorner(2, 2) * transform.col(2) + invtransform.col(2);
-            psopt::rectangle_rectangle_dual_distance(paths + 4 * i, parameters + 8 * i, (rect1.template cast<Scalar>()).eval(), (rect2.template cast<Scalar>()).eval(), invR2, invT2);
+            Eigen::Matrix<Scalar, 2, 2> R2 = invtransform.topLeftCorner(2, 2) * transform.topLeftCorner(2, 2); // vehicle 2 obstacle
+            Eigen::Matrix<Scalar, 2, 1> T2 = invtransform.topLeftCorner(2, 2) * transform.col(2) + invtransform.col(2);
+            psopt::rectangle_rectangle_dual_distance(paths + 4 * i, parameters + 8 * i, (rect1.template cast<Scalar>()).eval(), (rect2.template cast<Scalar>()).eval(), R2, T2);
         }
     }
 
@@ -104,13 +96,19 @@ private:
 
 int main(int argc, char* argv[])
 {
+    bool parking_forward;
+    int parking_scenario;
+    int parking_case;
+    std::size_t expected_nnodes;
+    // Parse the arguments, returns true if successful, false otherwise
+    if (!argParse(argc, argv, parking_forward, parking_scenario, parking_case, expected_nnodes)) return -1;
+
     std::shared_ptr<app::Box2dStateValidityChecker> svc;
-    bool parking_forward = false;
     double x0, y0, theta0;
     std::vector<double> trajx, trajy, trajt;
     double sampling_time;
-    if (!solve(argc, argv, svc, parking_scenario, parking_forward, x0, y0, theta0, trajx, trajy, trajt, sampling_time)) return -1;
-    std::size_t expected_nnodes = trajx.size();
+    if (!solve(parking_forward, parking_scenario, parking_case, expected_nnodes, svc, x0, y0, theta0, trajx, trajy, trajt, sampling_time)) return -1;
+    expected_nnodes = trajx.size();
 
     int nobstacle = 2;
     if (parking_scenario == 3)
@@ -136,24 +134,26 @@ int main(int argc, char* argv[])
     std::vector<std::size_t> nnodes(msdata.nsegments, nmod);
     nnodes.back() = expected_nnodes - (msdata.nsegments - 1) * (nmod - 1);
     msdata.nnodes.swap(nnodes);
-    psopt::ProblemInfo<double>* info = new psopt::ProblemInfo<double>(msdata);
+    psopt::OptimalControlProblemInfo<double>* info = new psopt::OptimalControlProblemInfo<double>(msdata);
     info->setLinearSolver("ma57");
     info->setTolerance(1.e-8);
 
     VehicleParam<double> *vehicleParam = new VehicleParam<double>(2.8, 0.96, 0.929, 1.942);
     FourScenariosProblemDualDistance<double>* problem = new FourScenariosProblemDualDistance<double>(info, vehicleParam, parking_forward);
 
-    four_scenarios_bounds(info, vehicleParam, parking_forward, x0, y0, theta0);
+    four_scenarios_bounds(info, vehicleParam, parking_forward, parking_scenario, x0, y0, theta0);
     info->setPhaseLowerBoundStartTime(0.0);
     info->setPhaseUpperBoundStartTime(0.0);
     info->setPhaseLowerBoundEndTime(2.0);
     info->setPhaseUpperBoundEndTime(20.0);
+    info->setPhaseConstantGuessParameters(1.0);
     for (std::size_t i = 1; i < msdata.nsegments; i++)
     {
         info->setPhaseLowerBoundStartTime(2.0, i);
         info->setPhaseUpperBoundStartTime(20.0, i);
         info->setPhaseLowerBoundEndTime(2.0, i);
         info->setPhaseUpperBoundEndTime(20.0, i);
+        info->setPhaseConstantGuessParameters(1.0, i);
     }
     four_scenarios_guess(info, x0, y0, theta0);
 
@@ -179,14 +179,6 @@ int main(int argc, char* argv[])
     {
         interp_trajomega[i] = (interp_trajalpha[i] - interp_trajalpha[i - 1]); 
     }
-
-    std::ofstream ofs;
-    ofs.open("pathsol_interp.txt"); // TODO delete
-    for (std::size_t i = 0; i < expected_nnodes; i++)
-    {
-        ofs << interp_trajx[i] << " " << interp_trajy[i] << " " << interp_trajt[i] << std::endl;
-    }
-    ofs.close();
 
     std::size_t start = 0;
     for (std::size_t k = 0; k < msdata.nsegments; k++)
@@ -220,16 +212,19 @@ int main(int argc, char* argv[])
     interp_trajomega.clear();
 
     double safety_distance = 0.05;
-    psopt::Solver<double> solver;
-    for (std::size_t j = 0; j < msdata.nsegments; j++)
-    {
-        info->setPhaseConstantGuessParameters(1.0, j);
-    }
     bounds_dual_distance(info, nobstacle, 8, safety_distance);
 
-    obstacles = generate_dual_obstacles(vehicleParam);
-    bool success = solver.solve(problem); // solve with first obstacles
+    obstacles = generate_dual_obstacles(vehicleParam, parking_scenario);
+    rect1 = Eigen::Matrix<double, 2, 1>(0.5 * vehicleParam->L, 0.5 * vehicleParam->W);
+    rect2 = rect1;
+    if (parking_scenario == 2)
+    {
+        rect2[0] = 0.5 * vehicleParam->W;
+        rect2[1] = 0.5 * vehicleParam->L;
+    }
 
+    psopt::OptimalControlSolver<double> solver;
+    bool success = solver.solve(problem); // solve with first obstacles
     if (success)
     {
         std::ofstream ofs;

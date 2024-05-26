@@ -48,26 +48,26 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     time1 = []
-    for line in open(str('TimeCost/box_time_'+str(args.scenario)+'.txt'), 'r').readlines():
+    for line in open(str('TimeCost20/box_time_'+str(args.scenario)+'.txt'), 'r').readlines():
         line = line.strip()
         if not line:
             continue
         t = [float(x) for x in line.split(' ')]
         time1.append(t)
 
-    line = open(str('TimeCost/box_cost_'+str(args.scenario)+'.txt'), 'r').readline()
+    line = open(str('TimeCost20/box_cost_'+str(args.scenario)+'.txt'), 'r').readline()
     line = line.strip()
     costs1 = [float(x) for x in line.split(' ')]
 
     time2 = []
-    for line in open(str('TimeCost/box_ap_time_'+str(args.scenario)+'.txt'), 'r').readlines():
+    for line in open(str('TimeCost20/box_ap_time_'+str(args.scenario)+'.txt'), 'r').readlines():
         line = line.strip()
         if not line:
             continue
         t = [float(x) for x in line.split(' ')]
         time2.append(t)
 
-    line = open(str('TimeCost/box_ap_cost_'+str(args.scenario)+'.txt'), 'r').readline()
+    line = open(str('TimeCost20/box_ap_cost_'+str(args.scenario)+'.txt'), 'r').readline()
     line = line.strip()
     costs2 = [float(x) for x in line.split(' ')]
 

@@ -39,7 +39,7 @@
 int main(int argc, char* argv[])
 {
     psopt::MultiSegmentData msdata;
-    psopt::Solver<double> solver;
+    psopt::OptimalControlSolver<double> solver;
     double stage1_time;
     solve(argc, argv, msdata, solver, stage1_time);
     return 0;
